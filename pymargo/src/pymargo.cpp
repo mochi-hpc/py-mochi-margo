@@ -23,6 +23,14 @@ struct pymargo_rpc_data {
 
 struct pymargo_hg_handle {
     hg_handle_t handle;
+    pymargo_hg_handle(hg_handle_t h)
+        : handle(h) {}
+    pymargo_hg_handle(const pymargo_hg_handle& other);
+    ~pymargo_hg_handle();
+    hg_info get_info() const;
+    std::string forward(const std::string& input);
+    void respond(const std::string& output);
+    margo_instance_id get_mid() const;
 };
 
 void delete_rpc_data(void* arg) {
@@ -102,22 +110,16 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 
     std::string out;
     try {
-        pymargo_hg_handle pyhandle;
-        pyhandle.handle = handle;
+        pymargo_hg_handle pyhandle(handle);
         margo_ref_incr(handle);
         bpl::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
         bpl::object r = 
         fun(pyhandle, std::string(input));
-//        fun(std::string(input));
-//        out = bpl::extract<std::string>(r);
     } catch(const bpl::error_already_set&) {
         PyErr_Print();
         exit(-1);
     }
-/*
-    hg_string_t output = const_cast<char*>(out.data());
-    margo_respond(handle, &output);
-*/
+
     ret = margo_free_input(handle, &input);
     if(ret != HG_SUCCESS) result = ret;
 
@@ -319,45 +321,39 @@ static pymargo_hg_handle pymargo_create(
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
 //    std::cerr << "In pymargo_create, handle addr = " << (void*)handle << std::endl;
-    pymargo_hg_handle pyhandle;
-    pyhandle.handle = handle;
+    pymargo_hg_handle pyhandle(handle);
     return pyhandle;
 }
 
-static hg_info pymargo_get_info(
-        pymargo_hg_handle pyhandle)
+hg_info pymargo_hg_handle::get_info() const
 {
-    return *margo_get_info(pyhandle.handle);
+    return *margo_get_info(handle);
 }
 
-static void pymargo_ref_incr(pymargo_hg_handle pyhandle)
+pymargo_hg_handle::pymargo_hg_handle(const pymargo_hg_handle& other)
+: handle(other.handle)
 {
-//    std::cerr << "In pymargo_ref_incr, handle addr = " << (void*)handle << std::endl;
-    margo_ref_incr(pyhandle.handle);
+    margo_ref_incr(handle);
     // TODO throw an exception if the return value is not  HG_SUCCESS
 }
 
-static void pymargo_destroy(pymargo_hg_handle pyhandle)
+pymargo_hg_handle::~pymargo_hg_handle()
 {
-//    std::cerr << "In pymargo_destroy, handle addr = " << (void*)handle << std::endl;
-    margo_destroy(pyhandle.handle);
+    margo_destroy(handle);
 }
 
-static std::string pymargo_forward(
-        pymargo_hg_handle pyhandle,
-        const std::string& input)
+std::string pymargo_hg_handle::forward(const std::string& input)
 {
-//    std::cerr << "In pymargo_forward, handle addr = " << (void*)handle << std::endl;
     hg_string_t instr = const_cast<char*>(input.data());
-    margo_forward(pyhandle.handle, &instr);
+    margo_forward(handle, &instr);
     // TODO throw an exception if the return value is not  HG_SUCCESS
     hg_string_t out;
-    margo_get_output(pyhandle.handle, &out);
+    margo_get_output(handle, &out);
     std::string result(out);
-    margo_free_output(pyhandle.handle, &out);
+    margo_free_output(handle, &out);
     return result;
 }
-
+/*
 static void pymargo_forward_timed(
         pymargo_hg_handle pyhandle,
         const std::string& input,
@@ -366,14 +362,12 @@ static void pymargo_forward_timed(
     margo_forward_timed(pyhandle.handle, const_cast<char*>(input.data()), timeout_ms);
     // TODO throw an exception if the return value is not  HG_SUCCESS
 }
-
-static void pymargo_respond(
-        pymargo_hg_handle pyhandle,
-        const std::string& output)
+*/
+void pymargo_hg_handle::respond(const std::string& output)
 {
     hg_string_t out;
     out = const_cast<char*>(output.data());
-    hg_return_t ret = margo_respond(pyhandle.handle, &out);
+    hg_return_t ret = margo_respond(handle, &out);
     // TODO throw an exception if the return value is not  HG_SUCCESS
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_respond() failed (ret = " << ret << ")" << std::endl;
@@ -381,13 +375,15 @@ static void pymargo_respond(
     }
 }
 
-static margo_instance_id pymargo_hg_handle_get_instance(pymargo_hg_handle pyh)
+margo_instance_id pymargo_hg_handle::get_mid() const
 {
-    return margo_hg_handle_get_instance(pyh.handle);
+    return margo_hg_handle_get_instance(handle);
 }
 
 BOOST_PYTHON_MODULE(_pymargo)
 {
+#define ret_policy_opaque bpl::return_value_policy<bpl::return_opaque_pointer>()
+
     bpl::opaque<margo_instance>();
     bpl::opaque<hg_addr>();
     bpl::enum_<pymargo_mode>("mode")
@@ -398,13 +394,17 @@ BOOST_PYTHON_MODULE(_pymargo)
         .value("in_caller_thread", PYMARGO_IN_CALLER_THREAD)
         .value("in_progress_thread", PYMARGO_IN_PROGRESS_THREAD)
         ;
-    bpl::class_<pymargo_hg_handle>("hg_handle");
     bpl::class_<hg_info>("hg_info", bpl::init<>())
         .def_readonly("addr", &hg_info::addr)
         .def_readonly("id", &hg_info::id)
-        .def_readonly("target_id", &hg_info::target_id);
-
-#define ret_policy_opaque bpl::return_value_policy<bpl::return_opaque_pointer>()
+        .def_readonly("target_id", &hg_info::target_id)
+        ;
+    bpl::class_<pymargo_hg_handle>("MargoHandle", bpl::no_init)
+        .def("get_info",&pymargo_hg_handle::get_info)
+        .def("forward", &pymargo_hg_handle::forward)
+        .def("respond", &pymargo_hg_handle::respond)
+        .def("get_mid", &pymargo_hg_handle::get_mid, ret_policy_opaque)
+        ;
 
     bpl::def("init",                    &pymargo_init, ret_policy_opaque);
     bpl::def("finalize",                &margo_finalize);
@@ -421,13 +421,13 @@ BOOST_PYTHON_MODULE(_pymargo)
     bpl::def("addr_dup",                &pymargo_addr_dup, ret_policy_opaque);
     bpl::def("addr2str",                &pymargo_addr_to_string);
     bpl::def("create",                  &pymargo_create);
-    bpl::def("destroy",                 &pymargo_destroy);
-    bpl::def("ref_incr",                &pymargo_ref_incr);
-    bpl::def("get_info",                &pymargo_get_info);
-    bpl::def("forward",                 &pymargo_forward);
-    bpl::def("forward_timed",           &pymargo_forward_timed);
-    bpl::def("respond",                 &pymargo_respond);
-    bpl::def("handle_get_instance",     &pymargo_hg_handle_get_instance, ret_policy_opaque);
+//    bpl::def("destroy",                 &pymargo_destroy);
+//    bpl::def("ref_incr",                &pymargo_ref_incr);
+//    bpl::def("get_info",                &pymargo_get_info);
+//    bpl::def("forward",                 &pymargo_forward);
+//    bpl::def("forward_timed",           &pymargo_forward_timed);
+//    bpl::def("respond",                 &pymargo_respond);
+//    bpl::def("handle_get_instance",     &pymargo_hg_handle_get_instance, ret_policy_opaque);
 
 #undef ret_policy_opaque
 }

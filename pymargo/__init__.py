@@ -24,7 +24,7 @@ class MargoAddress():
 
 	def get_hg_addr(self):
 		return self.__hg_addr
-
+"""
 class MargoHandle():
 
 	def __init__(self, hg_handle):
@@ -47,6 +47,7 @@ class MargoHandle():
 
 	def respond(self, arg):
 		return _pymargo.respond(self.__hg_handle, str(arg))
+"""
 
 class MargoInstance():
 
@@ -104,6 +105,4 @@ class MargoInstance():
 		return MargoAddress(self.__mid, hg_addr)
 
 	def create_handle(self, addr, rpc_id, mplex_id=0):
-		hg_handle = _pymargo.create(self.__mid, addr.get_hg_addr(), rpc_id, mplex_id)
-		h = MargoHandle(hg_handle)
-		return h
+		return _pymargo.create(self.__mid, addr.get_hg_addr(), rpc_id, mplex_id)

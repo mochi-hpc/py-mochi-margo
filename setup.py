@@ -17,7 +17,6 @@ pymargo_module = Extension('_pymargo', files,
 		           libraries=['boost_python','margo'],
 			   include_dirs=['.'],
 			   depends=[])
-
 setup(name='pymargo',
       version='0.1',
       author='Matthieu Dorier',

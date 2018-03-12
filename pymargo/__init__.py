@@ -24,30 +24,6 @@ class MargoAddress():
 
 	def get_hg_addr(self):
 		return self.__hg_addr
-"""
-class MargoHandle():
-
-	def __init__(self, hg_handle):
-		self.__hg_handle = hg_handle
-
-	def __del__(self):
-		_pymargo.destroy(self.__hg_handle)
-
-	def copy(self):
-		_pymargo.ref_incr(self.__hg_handle)
-
-	def get_info(self):
-		_pymargo.get_info(self.__hg_handle)
-
-	def forward(self, arg, timeout=None):
-		if timeout is None:
-			return _pymargo.forward(self.__hg_handle, str(arg))
-		else:
-			return _pymargo.forward_timed(self.__hg_handle, str(arg), timeout)
-
-	def respond(self, arg):
-		return _pymargo.respond(self.__hg_handle, str(arg))
-"""
 
 class MargoInstance():
 
@@ -106,3 +82,22 @@ class MargoInstance():
 
 	def create_handle(self, addr, rpc_id, mplex_id=0):
 		return _pymargo.create(self.__mid, addr.get_hg_addr(), rpc_id, mplex_id)
+
+class Provider(object):
+
+	def __init__(self, mid, mplex_id):
+		self.__mid = mid
+		self.__mplex_id = mplex_id
+
+	def register(self, rpc_name, method_name):
+		self.__mid.register(rpc_name, self, method_name, self.__mplex_id)
+
+	def registered(self, rpc_name):
+		return self.__mid.registered(rpc_name, self.__mplex_id)
+
+	def get_mplex_id(self):
+		return self.__mplex_id
+
+	def get_margo_instance(self):
+		return self.__mid
+

@@ -91,7 +91,7 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
     mid  = margo_hg_handle_get_instance(handle);
     info = margo_get_info(handle);
     ret  = margo_get_input(handle, &input);
-    
+
     if(ret != HG_SUCCESS) {
         result = ret;
         margo_free_input(handle, &input);
@@ -106,6 +106,12 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
     } else {
         void* data = margo_registered_data(mid, info->id);
         rpc_data = static_cast<pymargo_rpc_data*>(data);
+    }
+
+    if(!rpc_data) {
+        std::cerr << "[Py-Margo] ERROR: Received a request for a multiplex id "
+            << " with no registered provider" << std::endl;
+        return HG_OTHER_ERROR;
     }
 
     std::string out;
@@ -320,7 +326,6 @@ static pymargo_hg_handle pymargo_create(
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
-//    std::cerr << "In pymargo_create, handle addr = " << (void*)handle << std::endl;
     pymargo_hg_handle pyhandle(handle);
     return pyhandle;
 }
@@ -346,6 +351,7 @@ std::string pymargo_hg_handle::forward(const std::string& input)
 {
     hg_string_t instr = const_cast<char*>(input.data());
     margo_forward(handle, &instr);
+
     // TODO throw an exception if the return value is not  HG_SUCCESS
     hg_string_t out;
     margo_get_output(handle, &out);

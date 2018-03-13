@@ -92,3 +92,81 @@ Then run the client on a new terminal:
 python client.py ofi+sockets://10.0.2.15:39151 42 Matthieu
 ```
 
+### Sending/receiving Python objects
+
+The example above shows the basic principles of Py-Margo.
+Py-Margo's RPC always use a string as input and respond with a string.
+Yet this is sufficient to cover any use-cases you may have: Python
+indeed comes with a serialization package, `pickle`, that can take
+care of converting almost any Python object from/to a string.
+
+Let us assume we have a file named `mymaths.py` which contains the
+following definition of a point in 3D.
+
+```python
+class Point():
+	def __init__(self,x,y,z):
+		self.x = x
+		self.y = y
+		self.z = z
+	def __str__(self):
+		return 'Point ('+str(self.x)+','+str(self.y)+','+str(self.z)+')'
+```
+
+Then here is a server that can compute a cross product on two points sent by
+a client.
+
+```python
+from pymargo import MargoInstance
+from pymargo import Provider
+from mymaths import Point
+import pickle
+
+class VectorMathProvider(Provider):
+
+	def __init__(self, mid, mplex_id):
+		super(VectorMathProvider, self).__init__(mid, mplex_id)
+		self.register("cross_product", "cross_product")
+
+	def cross_product(self, handle, args):
+		points = pickle.loads(args)
+		print "Received: "+str(points)
+		x = points[0].y*points[1].z - points[0].z*points[1].y
+		y = points[0].z*points[1].x - points[0].x*points[1].z
+		z = points[0].x*points[1].y - points[0].y*points[1].x
+		res = Point(x,y,z)
+		handle.respond(pickle.dumps(res))
+		self.get_margo_instance().finalize()
+
+mid = MargoInstance('tcp')
+mplex_id = 42
+print "Server running at address "+str(mid.addr())+"with mplex_id="+str(mplex_id)
+
+provider = VectorMathProvider(mid, mplex_id)
+
+mid.wait_for_finalize()
+```
+
+And here is a client.
+
+```python
+import sys
+import pymargo
+import pickle
+from mymaths import Point
+from pymargo import MargoInstance
+
+def call_rpc_on(mid, rpc_id, addr_str, mplex_id, p1, p2):
+	addr = mid.lookup(addr_str)
+	handle = mid.create_handle(addr, rpc_id, mplex_id)
+	args = pickle.dumps([p1,p2])
+	res = handle.forward(args)
+	return pickle.loads(res)
+
+with MargoInstance('tcp', mode=pymargo.client) as mid:
+	rpc_id = mid.register("cross_product")
+	p1 = Point(1,2,3)
+	p2 = Point(4,5,6)
+	ret = call_rpc_on(mid, rpc_id, sys.argv[1], int(sys.argv[2]), p1, p2)
+	print str(ret)
+```

@@ -9,21 +9,21 @@ in_progress_thread = _pymargo.location.in_progress_thread
 class MargoAddress():
 
 	def __init__(self, mid, hg_addr, need_del=True):
-		self.__mid      = mid
-		self.__hg_addr  = hg_addr
-		self.__need_del = need_del
+		self._mid      = mid
+		self._hg_addr  = hg_addr
+		self._need_del = need_del
 
 	def __del__(self):
-		_pymargo.addr_free(self._mid, self.__hg_addr)
+		_pymargo.addr_free(self._mid, self._hg_addr)
 
 	def __str__(self):
-		return _pymargo.addr2str(self._mid, self.__hg_addr)
+		return _pymargo.addr2str(self._mid, self._hg_addr)
 
 	def copy(self):
-		return MargoAddress(self._mid, _pymargo.addr_dup(self._mid, self.__hg_addr))
+		return MargoAddress(self._mid, _pymargo.addr_dup(self._mid, self._hg_addr))
 
 	def get_hg_addr(self):
-		return self.__hg_addr
+		return self._hg_addr
 
 class MargoInstance():
 
@@ -32,10 +32,10 @@ class MargoInstance():
 			use_progress_thread=False,
 			rpc_location=in_caller_thread):
 		self._mid = _pymargo.init(addr, mode, use_progress_thread, rpc_location)
-		self.__finalized = False
+		self._finalized = False
 
 	def __del__(self):
-		if not self.__finalized:
+		if not self._finalized:
 			_pymargo.finalize(self._mid);
 
 	def __enter__(self):
@@ -46,11 +46,11 @@ class MargoInstance():
 
 	def finalize(self):
 		_pymargo.finalize(self._mid);
-		self.__finalized = True
+		self._finalized = True
 
 	def wait_for_finalize(self):
 		_pymargo.wait_for_finalize(self._mid)
-		self.__finalized = True
+		self._finalized = True
 
 	def on_finalize(self, callable_obj):
 		_pymargo.push_finalize_callback(self._mid, callable_obj)
@@ -86,18 +86,18 @@ class MargoInstance():
 class Provider(object):
 
 	def __init__(self, mid, mplex_id):
-		self.__mid = mid
-		self.__mplex_id = mplex_id
+		self._mid = mid
+		self._mplex_id = mplex_id
 
 	def register(self, rpc_name, method_name):
-		self.__mid.register(rpc_name, self, method_name, self.__mplex_id)
+		self._mid.register(rpc_name, self, method_name, self._mplex_id)
 
 	def registered(self, rpc_name):
-		return self.__mid.registered(rpc_name, self.__mplex_id)
+		return self._mid.registered(rpc_name, self._mplex_id)
 
 	def get_mplex_id(self):
-		return self.__mplex_id
+		return self._mplex_id
 
 	def get_margo_instance(self):
-		return self.__mid
+		return self._mid
 

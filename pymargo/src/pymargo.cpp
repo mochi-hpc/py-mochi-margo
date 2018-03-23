@@ -1,3 +1,8 @@
+/*
+ * (C) 2018 The University of Chicago
+ * 
+ * See COPYRIGHT in top-level directory.
+ */
 #define BOOST_NO_AUTO_PTR
 #include <boost/python.hpp>
 #include <boost/python/return_opaque_pointer.hpp>

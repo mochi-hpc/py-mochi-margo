@@ -12,10 +12,14 @@ class HelloProvider(Provider):
 		handle.respond("Hi "+name+"!")
 		self.get_margo_instance().finalize()
 
+def WhenFinalize():
+	print "Finalize was called"
+
 mid = MargoInstance('tcp')
 mplex_id = 42
 print "Server running at address "+str(mid.addr())+"with mplex_id="+str(mplex_id)
 
+mid.on_finalize(WhenFinalize)
 provider = HelloProvider(mid, mplex_id)
 
 mid.wait_for_finalize()

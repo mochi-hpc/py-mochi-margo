@@ -65,7 +65,7 @@ static void pymargo_generic_finalize_cb(void* arg)
         PyObject* pyobj = static_cast<PyObject*>(arg);
         bpl::handle<> h(pyobj); 
         bpl::object fun(h);
-        fun(h);
+        fun();
     } catch(const bpl::error_already_set&) {
         PyErr_Print();
         exit(-1);

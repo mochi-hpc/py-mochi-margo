@@ -33,7 +33,7 @@ struct pymargo_hg_handle {
     pymargo_hg_handle(const pymargo_hg_handle& other);
     ~pymargo_hg_handle();
     hg_info get_info() const;
-    std::string forward(const std::string& input);
+    std::string forward(uint16_t provider_id, const std::string& input);
     void respond(const std::string& output);
     margo_instance_id get_mid() const;
 };
@@ -105,16 +105,11 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
     }
 
     pymargo_rpc_data* rpc_data = NULL;
-    if(info->target_id) {
-        void* data = margo_registered_data_mplex(mid, info->id, info->target_id);
-        rpc_data = static_cast<pymargo_rpc_data*>(data);
-    } else {
-        void* data = margo_registered_data(mid, info->id);
-        rpc_data = static_cast<pymargo_rpc_data*>(data);
-    }
+    void* data = margo_registered_data(mid, info->id);
+    rpc_data = static_cast<pymargo_rpc_data*>(data);
 
     if(!rpc_data) {
-        std::cerr << "[Py-Margo] ERROR: Received a request for a multiplex id "
+        std::cerr << "[Py-Margo] ERROR: Received a request for a provider id "
             << " with no registered provider" << std::endl;
         return HG_OTHER_ERROR;
     }
@@ -144,36 +139,26 @@ DEFINE_MARGO_RPC_HANDLER(pymargo_generic_rpc_callback)
 static hg_id_t pymargo_register(
         margo_instance_id mid,
         const std::string& rpc_name,
-        uint8_t mplex_id,
+        uint16_t provider_id,
         bpl::object obj,
         const std::string& method_name)
 {
     int ret;
 
     hg_id_t rpc_id;
-    if(mplex_id) {
-        rpc_id = MARGO_REGISTER_MPLEX(mid, rpc_name.c_str(),
-                    hg_string_t, hg_string_t, pymargo_generic_rpc_callback,
-                    mplex_id, ABT_POOL_NULL);
-    } else {
-        rpc_id = MARGO_REGISTER(mid, rpc_name.c_str(),
-                    hg_string_t, hg_string_t, pymargo_generic_rpc_callback);
-    }
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, rpc_name.c_str(),
+            hg_string_t, hg_string_t, pymargo_generic_rpc_callback,
+            provider_id, ABT_POOL_NULL);
 
     pymargo_rpc_data* rpc_data = new pymargo_rpc_data;
     rpc_data->obj    = obj;
     rpc_data->method = method_name;
 
-    if(mplex_id) {
-        ret = margo_register_data_mplex(mid, rpc_id, mplex_id, 
+    ret = margo_register_data(mid, rpc_id,
                 static_cast<void*>(rpc_data), delete_rpc_data);
-    } else {
-        ret = margo_register_data(mid, rpc_id,
-                static_cast<void*>(rpc_data), delete_rpc_data);
-    }
     // TODO throw an exception if the return value is not  HG_SUCCESS
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_register_data_mplex() failed (ret = " << ret << ")" << std::endl;
+        std::cerr << "margo_register_data() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
     return rpc_id;
@@ -182,17 +167,12 @@ static hg_id_t pymargo_register(
 static hg_id_t pymargo_register_on_client(
         margo_instance_id mid,
         const std::string& rpc_name,
-        uint8_t mplex_id)
+        uint16_t provider_id)
 {
     hg_id_t rpc_id;
-    if(mplex_id) {
-        rpc_id = MARGO_REGISTER_MPLEX(mid, rpc_name.c_str(),
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, rpc_name.c_str(),
                     hg_string_t, hg_string_t, NULL,
-                    mplex_id, ABT_POOL_NULL);
-    } else {
-        rpc_id = MARGO_REGISTER(mid, rpc_name.c_str(),
-                    hg_string_t, hg_string_t, NULL);
-    }
+                    provider_id, ABT_POOL_NULL);
     // TODO throw an exception if the return value is not correct
     return rpc_id;
 }
@@ -218,16 +198,16 @@ static bpl::object pymargo_registered(
     }
 }
 
-static bpl::object pymargo_registered_mplex(
+static bpl::object pymargo_provider_registered(
         margo_instance_id mid,
         const std::string& rpc_name,
-        uint8_t mplex_id)
+        uint16_t provider_id)
 {
     hg_id_t id;
     hg_bool_t flag;
     hg_return_t ret;
 
-    ret = margo_registered_name_mplex(mid, rpc_name.c_str(), mplex_id, &id, &flag);
+    ret = margo_provider_registered_name(mid, rpc_name.c_str(), provider_id, &id, &flag);
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_registered_name_mplex() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
@@ -314,20 +294,13 @@ static std::string pymargo_addr_to_string(
 static pymargo_hg_handle pymargo_create(
         margo_instance_id mid,
         hg_addr_t addr,
-        hg_id_t id,
-        uint8_t mplex_id)
+        hg_id_t id)
 {
     hg_handle_t handle;
     hg_return_t ret;
     ret = margo_create(mid, addr, id, &handle);
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_create() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
-    }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
-    ret = margo_set_target_id(handle, mplex_id);
-    if(ret != HG_SUCCESS) {
-        std::cerr << "margo_set_target_id() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
@@ -352,10 +325,10 @@ pymargo_hg_handle::~pymargo_hg_handle()
     margo_destroy(handle);
 }
 
-std::string pymargo_hg_handle::forward(const std::string& input)
+std::string pymargo_hg_handle::forward(uint16_t provider_id, const std::string& input)
 {
     hg_string_t instr = const_cast<char*>(input.data());
-    margo_forward(handle, &instr);
+    margo_provider_forward(provider_id, handle, &instr);
 
     // TODO throw an exception if the return value is not  HG_SUCCESS
     hg_string_t out;
@@ -408,7 +381,6 @@ BOOST_PYTHON_MODULE(_pymargo)
     bpl::class_<hg_info>("hg_info", bpl::init<>())
         .def_readonly("addr", &hg_info::addr)
         .def_readonly("id", &hg_info::id)
-        .def_readonly("target_id", &hg_info::target_id)
         ;
     bpl::class_<pymargo_hg_handle>("MargoHandle", bpl::no_init)
         .def("get_info",&pymargo_hg_handle::get_info)
@@ -425,7 +397,7 @@ BOOST_PYTHON_MODULE(_pymargo)
     bpl::def("register",                &pymargo_register);
     bpl::def("register_on_client",      &pymargo_register_on_client);
     bpl::def("registered",              &pymargo_registered);
-    bpl::def("registered_mplex",        &pymargo_registered_mplex);
+    bpl::def("registered_mplex",        &pymargo_provider_registered);
     bpl::def("lookup",                  &pymargo_lookup, ret_policy_opaque);
     bpl::def("addr_free",               &pymargo_addr_free);
     bpl::def("addr_self",               &pymargo_addr_self, ret_policy_opaque);

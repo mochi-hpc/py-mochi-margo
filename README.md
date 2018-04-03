@@ -40,8 +40,8 @@ from pymargo import Provider
 
 class HelloProvider(Provider):
 
-	def __init__(self, mid, mplex_id):
-		super(HelloProvider, self).__init__(mid, mplex_id)
+	def __init__(self, mid, provider_id):
+		super(HelloProvider, self).__init__(mid, provider_id)
 		self.register("say_hello", "hello")
 
 	def hello(self, handle, name):
@@ -50,10 +50,10 @@ class HelloProvider(Provider):
 		self.get_margo_instance().finalize()
 
 mid = MargoInstance('tcp')
-mplex_id = 42
-print "Server running at address "+str(mid.addr())+"with mplex_id="+str(mplex_id)
+provider_id = 42
+print "Server running at address "+str(mid.addr())+"with provider_id="+str(provider_id)
 
-provider = HelloProvider(mid, mplex_id)
+provider = HelloProvider(mid, provider_id)
 
 mid.wait_for_finalize()
 ```
@@ -65,10 +65,10 @@ import sys
 import pymargo
 from pymargo import MargoInstance
 
-def call_rpc_on(mid, rpc_id, addr_str, mplex_id, name):
+def call_rpc_on(mid, rpc_id, addr_str, provider_id, name):
 	addr = mid.lookup(addr_str)
-	handle = mid.create_handle(addr, rpc_id, mplex_id)
-	return handle.forward(name)
+	handle = mid.create_handle(addr, rpc_id, provider_id)
+	return handle.forward(provider_id, name)
 
 with MargoInstance('tcp', mode=pymargo.client) as mid:
 	rpc_id = mid.register("say_hello")
@@ -83,7 +83,7 @@ python server.py
 ```
 This will output something like
 ```
-Server running at address ofi+sockets://10.0.2.15:39151 with mplex_id=42
+Server running at address ofi+sockets://10.0.2.15:39151 with provider_id=42
 ```
 
 Then run the client on a new terminal:
@@ -124,8 +124,8 @@ import pickle
 
 class VectorMathProvider(Provider):
 
-	def __init__(self, mid, mplex_id):
-		super(VectorMathProvider, self).__init__(mid, mplex_id)
+	def __init__(self, mid, provider_id):
+		super(VectorMathProvider, self).__init__(mid, provider_id)
 		self.register("cross_product", "cross_product")
 
 	def cross_product(self, handle, args):
@@ -139,10 +139,10 @@ class VectorMathProvider(Provider):
 		self.get_margo_instance().finalize()
 
 mid = MargoInstance('tcp')
-mplex_id = 42
-print "Server running at address "+str(mid.addr())+"with mplex_id="+str(mplex_id)
+provider_id = 42
+print "Server running at address "+str(mid.addr())+"with provider_id="+str(provider_id)
 
-provider = VectorMathProvider(mid, mplex_id)
+provider = VectorMathProvider(mid, provider_id)
 
 mid.wait_for_finalize()
 ```
@@ -156,9 +156,9 @@ import pickle
 from mymaths import Point
 from pymargo import MargoInstance
 
-def call_rpc_on(mid, rpc_id, addr_str, mplex_id, p1, p2):
+def call_rpc_on(mid, rpc_id, addr_str, provider_id, p1, p2):
 	addr = mid.lookup(addr_str)
-	handle = mid.create_handle(addr, rpc_id, mplex_id)
+	handle = mid.create_handle(addr, rpc_id, provider_id)
 	args = pickle.dumps([p1,p2])
 	res = handle.forward(args)
 	return pickle.loads(res)

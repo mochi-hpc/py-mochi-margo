@@ -13,13 +13,8 @@ os.environ['OPT'] = " ".join(
 
 pk = pkgconfig.parse('margo')
 libraries = pk['libraries']
-if (sys.version_info[0] == 3):
-    libraries.append('boost_python3')
-elif ((sys.version_info[0] == 2 and sys.version_info[1] == 7)):
-    libraries.append('boost_python27')
-else:
-    raise "PyMargo only works with Python 2.7 or Python 3"
-
+python_version = str(sys.version_info[0])+str(sys.version_info[1])
+libraries.append('boost_python'+python_version)
 library_dirs = pk['library_dirs'] 
 include_dirs = pk['include_dirs']
 include_dirs.append(".")

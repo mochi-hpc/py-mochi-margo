@@ -11,8 +11,6 @@ os.environ['OPT'] = " ".join(
 		    flag for flag in opt.split() if flag != '-Wstrict-prototypes'
 		)
 
-standard_lib_path = os.environ['LIBRARY_PATH'].split(':')
-
 pk = pkgconfig.parse('margo')
 libraries = pk['libraries']
 if (sys.version_info[0] == 3):

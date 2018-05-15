@@ -287,6 +287,7 @@ static std::string pymargo_addr_to_string(
     std::string result(buf_size+1,' ');
     buf_size += 1;
     margo_addr_to_string(mid, const_cast<char*>(result.data()), &buf_size, addr);
+    result.resize(buf_size);
     // TODO throw an exception if the return value is not  HG_SUCCESS
     return result;
 }

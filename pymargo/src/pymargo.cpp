@@ -284,10 +284,9 @@ static std::string pymargo_addr_to_string(
     hg_size_t buf_size = 0;
     margo_addr_to_string(mid, NULL, &buf_size, addr);
     // TODO throw an exception if the return value is not  HG_SUCCESS
-    std::string result(buf_size+1,' ');
-    buf_size += 1;
+    std::string result(buf_size,' ');
     margo_addr_to_string(mid, const_cast<char*>(result.data()), &buf_size, addr);
-    result.resize(buf_size);
+    result.resize(buf_size-1);
     // TODO throw an exception if the return value is not  HG_SUCCESS
     return result;
 }

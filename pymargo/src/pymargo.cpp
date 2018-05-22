@@ -67,10 +67,13 @@ static margo_instance_id pymargo_init(
 static void pymargo_generic_finalize_cb(void* arg)
 {
     try {
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
         PyObject* pyobj = static_cast<PyObject*>(arg);
         bpl::handle<> h(pyobj); 
         bpl::object fun(h);
         fun();
+        PyGILState_Release(gstate);
     } catch(const bpl::error_already_set&) {
         PyErr_Print();
         exit(-1);
@@ -116,11 +119,13 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 
     std::string out;
     try {
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
         pymargo_hg_handle pyhandle(handle);
         margo_ref_incr(handle);
         bpl::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
-        bpl::object r = 
-        fun(pyhandle, std::string(input));
+        bpl::object r = fun(pyhandle, std::string(input));
+        PyGILState_Release(gstate);
     } catch(const bpl::error_already_set&) {
         PyErr_Print();
         exit(-1);
@@ -328,7 +333,9 @@ pymargo_hg_handle::~pymargo_hg_handle()
 std::string pymargo_hg_handle::forward(uint16_t provider_id, const std::string& input)
 {
     hg_string_t instr = const_cast<char*>(input.data());
+    Py_BEGIN_ALLOW_THREADS
     margo_provider_forward(provider_id, handle, &instr);
+    Py_END_ALLOW_THREADS
 
     // TODO throw an exception if the return value is not  HG_SUCCESS
     hg_string_t out;
@@ -351,7 +358,10 @@ void pymargo_hg_handle::respond(const std::string& output)
 {
     hg_string_t out;
     out = const_cast<char*>(output.data());
-    hg_return_t ret = margo_respond(handle, &out);
+    hg_return_t ret;
+    Py_BEGIN_ALLOW_THREADS
+    ret = margo_respond(handle, &out);
+    Py_END_ALLOW_THREADS
     // TODO throw an exception if the return value is not  HG_SUCCESS
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_respond() failed (ret = " << ret << ")" << std::endl;
@@ -404,13 +414,5 @@ BOOST_PYTHON_MODULE(_pymargo)
     bpl::def("addr_dup",                &pymargo_addr_dup, ret_policy_opaque);
     bpl::def("addr2str",                &pymargo_addr_to_string);
     bpl::def("create",                  &pymargo_create);
-//    bpl::def("destroy",                 &pymargo_destroy);
-//    bpl::def("ref_incr",                &pymargo_ref_incr);
-//    bpl::def("get_info",                &pymargo_get_info);
-//    bpl::def("forward",                 &pymargo_forward);
-//    bpl::def("forward_timed",           &pymargo_forward_timed);
-//    bpl::def("respond",                 &pymargo_respond);
-//    bpl::def("handle_get_instance",     &pymargo_hg_handle_get_instance, ret_policy_opaque);
-
 #undef ret_policy_opaque
 }

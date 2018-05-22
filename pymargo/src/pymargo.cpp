@@ -374,6 +374,111 @@ margo_instance_id pymargo_hg_handle::get_mid() const
     return margo_hg_handle_get_instance(handle);
 }
 
+///////////////////////////////////////////////////////////////////////////////////
+// ABT namespace
+///////////////////////////////////////////////////////////////////////////////////
+struct abtns {};
+
+class py_abt_mutex {
+        
+    ABT_mutex mutex_m;
+
+    public:
+
+    explicit py_abt_mutex(bool recursive = false) {
+        ABT_mutex_attr attr;
+        ABT_mutex_attr_create(&attr);
+        if(recursive)
+            ABT_mutex_attr_set_recursive(attr, ABT_TRUE);
+        ABT_mutex_create_with_attr(attr, &mutex_m);
+        ABT_mutex_attr_free(&attr);
+    }
+
+    py_abt_mutex(const py_abt_mutex& other) = delete;
+
+    py_abt_mutex(py_abt_mutex&& other) {
+        mutex_m = other.mutex_m;
+        other.mutex_m = ABT_MUTEX_NULL;
+    }
+
+    ~py_abt_mutex() noexcept {
+        if(mutex_m != ABT_MUTEX_NULL)
+            ABT_mutex_free(&mutex_m);
+    }
+
+    int lock() noexcept {
+        int ret;
+        Py_BEGIN_ALLOW_THREADS
+        ret = ABT_mutex_lock(mutex_m);
+        Py_END_ALLOW_THREADS
+        return ret;
+    }
+
+    int unlock() noexcept {
+        int ret;
+        Py_BEGIN_ALLOW_THREADS
+        ret = ABT_mutex_unlock(mutex_m);
+        Py_END_ALLOW_THREADS
+        return ret;
+    }
+};
+
+class py_abt_rwlock {
+        
+    ABT_rwlock lock_m;
+
+    public:
+
+    explicit py_abt_rwlock() {
+        ABT_rwlock_create(&lock_m);
+    }
+
+    py_abt_rwlock(const py_abt_rwlock&) = delete;
+
+    py_abt_rwlock(py_abt_rwlock&& other) {
+        lock_m = other.lock_m;
+        other.lock_m = ABT_RWLOCK_NULL;
+    }
+
+    ~py_abt_rwlock() noexcept {
+        if(lock_m != ABT_RWLOCK_NULL)
+            ABT_rwlock_free(&lock_m);
+    }
+
+    int rdlock() noexcept {
+        int ret;
+        Py_BEGIN_ALLOW_THREADS
+        ret = ABT_rwlock_rdlock(lock_m);
+        Py_END_ALLOW_THREADS
+        return ret;
+    }
+
+    int wrlock() noexcept {
+        int ret;
+        Py_BEGIN_ALLOW_THREADS
+        ret = ABT_rwlock_wrlock(lock_m);
+        Py_END_ALLOW_THREADS
+        return ret;
+    }
+
+    int unlock() noexcept {
+        int ret;
+        Py_BEGIN_ALLOW_THREADS
+        ret = ABT_rwlock_unlock(lock_m);
+        Py_END_ALLOW_THREADS
+        return ret;
+    }
+};
+
+static int py_abt_yield() {
+    int ret;
+    Py_BEGIN_ALLOW_THREADS
+    ret = ABT_thread_yield();
+    Py_END_ALLOW_THREADS
+    return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////////
 BOOST_PYTHON_MODULE(_pymargo)
 {
 #define ret_policy_opaque bpl::return_value_policy<bpl::return_opaque_pointer>()
@@ -414,5 +519,18 @@ BOOST_PYTHON_MODULE(_pymargo)
     bpl::def("addr_dup",                &pymargo_addr_dup, ret_policy_opaque);
     bpl::def("addr2str",                &pymargo_addr_to_string);
     bpl::def("create",                  &pymargo_create);
+
+    // Inside abt package
+    bpl::scope abt_package = bpl::class_<abtns>("abt");
+    bpl::def("yield", &py_abt_yield);
+    bpl::class_<py_abt_mutex, boost::noncopyable>("Mutex", bpl::init<>())
+        .def(bpl::init<bool>())
+        .def("lock", &py_abt_mutex::lock)
+        .def("unlock", &py_abt_mutex::unlock);
+    bpl::class_<py_abt_rwlock, boost::noncopyable>("RWLock", bpl::init<>())
+        .def("rdlock", &py_abt_rwlock::rdlock)
+        .def("wrlock", &py_abt_rwlock::wrlock)
+        .def("unlock", &py_abt_rwlock::unlock);
+
 #undef ret_policy_opaque
 }

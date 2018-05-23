@@ -504,21 +504,22 @@ BOOST_PYTHON_MODULE(_pymargo)
         .def("get_mid", &pymargo_hg_handle::get_mid, ret_policy_opaque)
         ;
 
-    bpl::def("init",                    &pymargo_init, ret_policy_opaque);
-    bpl::def("finalize",                &margo_finalize);
-    bpl::def("wait_for_finalize",       &margo_wait_for_finalize);
-    bpl::def("push_finalize_callback",  &pymargo_push_finalize_callback);
-    bpl::def("enable_remote_shutdown",  &margo_enable_remote_shutdown);
-    bpl::def("register",                &pymargo_register);
-    bpl::def("register_on_client",      &pymargo_register_on_client);
-    bpl::def("registered",              &pymargo_registered);
-    bpl::def("registered_mplex",        &pymargo_provider_registered);
-    bpl::def("lookup",                  &pymargo_lookup, ret_policy_opaque);
-    bpl::def("addr_free",               &pymargo_addr_free);
-    bpl::def("addr_self",               &pymargo_addr_self, ret_policy_opaque);
-    bpl::def("addr_dup",                &pymargo_addr_dup, ret_policy_opaque);
-    bpl::def("addr2str",                &pymargo_addr_to_string);
-    bpl::def("create",                  &pymargo_create);
+    bpl::def("init",                     &pymargo_init, ret_policy_opaque);
+    bpl::def("finalize",                 &margo_finalize);
+    bpl::def("wait_for_finalize",        &margo_wait_for_finalize);
+    bpl::def("push_finalize_callback",   &pymargo_push_finalize_callback);
+    bpl::def("enable_remote_shutdown",   &margo_enable_remote_shutdown);
+    bpl::def("shutdown_remote_instance", &margo_shutdown_remote_instance);
+    bpl::def("register",                 &pymargo_register);
+    bpl::def("register_on_client",       &pymargo_register_on_client);
+    bpl::def("registered",               &pymargo_registered);
+    bpl::def("registered_mplex",         &pymargo_provider_registered);
+    bpl::def("lookup",                   &pymargo_lookup, ret_policy_opaque);
+    bpl::def("addr_free",                &pymargo_addr_free);
+    bpl::def("addr_self",                &pymargo_addr_self, ret_policy_opaque);
+    bpl::def("addr_dup",                 &pymargo_addr_dup, ret_policy_opaque);
+    bpl::def("addr2str",                 &pymargo_addr_to_string);
+    bpl::def("create",                   &pymargo_create);
 
     // Inside abt package
     bpl::scope abt_package = bpl::class_<abtns>("abt");

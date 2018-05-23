@@ -28,7 +28,7 @@ class MargoAddress():
         return self._hg_addr
 
     def shutdown(self):
-        _pymargo.remote_shutdown(self._mid, self._hg_addr)
+        _pymargo.shutdown_remote_instance(self._mid, self._hg_addr)
 
 class MargoInstance():
 

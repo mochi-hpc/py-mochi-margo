@@ -13,8 +13,6 @@ os.environ['OPT'] = " ".join(
 
 pk = pkgconfig.parse('margo')
 libraries = pk['libraries']
-python_version = str(sys.version_info[0])+str(sys.version_info[1])
-libraries.append('boost_python'+python_version)
 library_dirs = pk['library_dirs'] 
 include_dirs = pk['include_dirs']
 include_dirs.append(".")

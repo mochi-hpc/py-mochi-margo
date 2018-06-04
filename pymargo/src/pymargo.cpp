@@ -3,26 +3,24 @@
  * 
  * See COPYRIGHT in top-level directory.
  */
-#define BOOST_NO_AUTO_PTR
-#include <boost/python.hpp>
-#include <boost/python/return_opaque_pointer.hpp>
-#include <boost/python/handle.hpp>
-#include <boost/python/enum.hpp>
-#include <boost/python/def.hpp>
-#include <boost/python/module.hpp>
-#include <boost/python/return_value_policy.hpp>
+#include <pybind11/pybind11.h>
 #include <string>
 #include <iostream>
 #include <mercury_proc_string.h>
 #include <margo.h>
 
-BOOST_PYTHON_OPAQUE_SPECIALIZED_TYPE_ID(margo_instance)
-BOOST_PYTHON_OPAQUE_SPECIALIZED_TYPE_ID(hg_addr)
+namespace py11 = pybind11;
 
-namespace bpl = boost::python;
+typedef py11::capsule pymargo_instance_id;
+typedef py11::capsule pymargo_addr;
 
-struct pymargo_rpc_data {
-    bpl::object obj;
+#define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id", nullptr)
+#define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t", nullptr)
+#define CAPSULE2MID(__caps)  (margo_instance_id)(__caps)
+#define CAPSULE2ADDR(__caps) (hg_addr_t)(__caps)
+
+struct __attribute__ ((visibility("hidden"))) pymargo_rpc_data {
+    py11::object obj;
     std::string method;
 };
 
@@ -32,10 +30,11 @@ struct pymargo_hg_handle {
         : handle(h) {}
     pymargo_hg_handle(const pymargo_hg_handle& other);
     ~pymargo_hg_handle();
-    hg_info get_info() const;
+    hg_id_t get_id() const;
+    pymargo_addr get_addr() const;
     std::string forward(uint16_t provider_id, const std::string& input);
     void respond(const std::string& output);
-    margo_instance_id get_mid() const;
+    pymargo_instance_id get_mid() const;
 };
 
 void delete_rpc_data(void* arg) {
@@ -53,7 +52,7 @@ enum pymargo_rpc_mode {
     PYMARGO_IN_PROGRESS_THREAD
 };
 
-static margo_instance_id pymargo_init(
+static pymargo_instance_id pymargo_init(
         const std::string& addr,
         pymargo_mode mode,
         bool use_progress_thread,
@@ -61,7 +60,8 @@ static margo_instance_id pymargo_init(
 {
     int l = loc == PYMARGO_IN_CALLER_THREAD ? 0 : -1;
     if(mode == PYMARGO_CLIENT_MODE) l = 0;
-    return margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
+    margo_instance_id mid = margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
+    return MID2CAPSULE(mid);
 }
 
 static void pymargo_generic_finalize_cb(void* arg)
@@ -70,22 +70,24 @@ static void pymargo_generic_finalize_cb(void* arg)
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
         PyObject* pyobj = static_cast<PyObject*>(arg);
-        bpl::handle<> h(pyobj); 
-        bpl::object fun(h);
+        py11::handle fun(pyobj); 
         fun();
         PyGILState_Release(gstate);
-    } catch(const bpl::error_already_set&) {
+    } catch(const py11::error_already_set&) {
         PyErr_Print();
         exit(-1);
     }
 }
 
 static void pymargo_push_finalize_callback(
-        margo_instance_id mid,
-        bpl::object cb)
+        pymargo_instance_id mid,
+        py11::object cb)
 {
     Py_INCREF(cb.ptr());
-    margo_push_finalize_callback(mid, &pymargo_generic_finalize_cb, static_cast<void*>(cb.ptr()));
+    margo_push_finalize_callback(
+            mid, 
+            &pymargo_generic_finalize_cb,
+            static_cast<void*>(cb.ptr()));
 }
 
 static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
@@ -123,10 +125,10 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         gstate = PyGILState_Ensure();
         pymargo_hg_handle pyhandle(handle);
         margo_ref_incr(handle);
-        bpl::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
-        bpl::object r = fun(pyhandle, std::string(input));
+        py11::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
+        py11::object r = fun(pyhandle, std::string(input));
         PyGILState_Release(gstate);
-    } catch(const bpl::error_already_set&) {
+    } catch(const py11::error_already_set&) {
         PyErr_Print();
         exit(-1);
     }
@@ -142,10 +144,10 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 DEFINE_MARGO_RPC_HANDLER(pymargo_generic_rpc_callback)
 
 static hg_id_t pymargo_register(
-        margo_instance_id mid,
+        pymargo_instance_id mid,
         const std::string& rpc_name,
         uint16_t provider_id,
-        bpl::object obj,
+        py11::object obj,
         const std::string& method_name)
 {
     int ret;
@@ -170,41 +172,47 @@ static hg_id_t pymargo_register(
 }
 
 static hg_id_t pymargo_register_on_client(
-        margo_instance_id mid,
+        pymargo_instance_id mid,
         const std::string& rpc_name,
         uint16_t provider_id)
 {
     hg_id_t rpc_id;
-    rpc_id = MARGO_REGISTER_PROVIDER(mid, rpc_name.c_str(),
+
+    rpc_id = MARGO_REGISTER_PROVIDER(
+                    mid,
+                    rpc_name.c_str(),
                     hg_string_t, hg_string_t, NULL,
                     provider_id, ABT_POOL_NULL);
     // TODO throw an exception if the return value is not correct
     return rpc_id;
 }
 
-static bpl::object pymargo_registered(
-        margo_instance_id mid,
+static py11::object pymargo_registered(
+        pymargo_instance_id mid,
         const std::string& rpc_name)
 {
     hg_id_t id;
     hg_bool_t flag;
     hg_return_t ret;
-    
-    ret = margo_registered_name(mid, rpc_name.c_str(), &id, &flag);
+
+    ret = margo_registered_name(
+            mid,
+            rpc_name.c_str(), &id, &flag);
+
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_registered_name() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
     if(flag) {
-        return bpl::object(id);
+        return py11::cast(id);
     } else {
-        return bpl::object();
+        return py11::none();
     }
 }
 
-static bpl::object pymargo_provider_registered(
-        margo_instance_id mid,
+static py11::object pymargo_provider_registered(
+        pymargo_instance_id mid,
         const std::string& rpc_name,
         uint16_t provider_id)
 {
@@ -212,41 +220,45 @@ static bpl::object pymargo_provider_registered(
     hg_bool_t flag;
     hg_return_t ret;
 
-    ret = margo_provider_registered_name(mid, rpc_name.c_str(), provider_id, &id, &flag);
+    ret = margo_provider_registered_name(
+            mid, 
+            rpc_name.c_str(), provider_id, &id, &flag);
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_registered_name_mplex() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
     if(flag) {
-        return bpl::object(id);
+        return py11::cast(id);
     } else {
-        return bpl::object();
+        return py11::none();
     }
 }
 
-static hg_addr_t pymargo_lookup(
-        margo_instance_id mid,
+static pymargo_addr pymargo_lookup(
+        pymargo_instance_id mid,
         const std::string& addrstr)
 {
     hg_addr_t addr;
     hg_return_t ret;
 
-    ret = margo_addr_lookup(mid, addrstr.c_str(), &addr);
+    ret = margo_addr_lookup(
+            mid, 
+            addrstr.c_str(), &addr);
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_addr_lookup() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
-    return addr;
+    return ADDR2CAPSULE(addr);
 }
 
 static void pymargo_addr_free(
-        margo_instance_id mid,
-        hg_addr_t addr)
+        pymargo_instance_id mid,
+        pymargo_addr pyaddr)
 {
     hg_return_t ret;
-    ret = margo_addr_free(mid, addr);
+    ret = margo_addr_free(mid, pyaddr);
     if(ret != HG_SUCCESS) {
         std::cerr << "margo_addr_free() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
@@ -254,8 +266,8 @@ static void pymargo_addr_free(
     // TODO throw an exception if the return value is not  HG_SUCCESS
 }
 
-static hg_addr_t pymargo_addr_self(
-        margo_instance_id mid)
+static pymargo_addr pymargo_addr_self(
+        pymargo_instance_id mid)
 {
     hg_addr_t addr;
     hg_return_t ret;
@@ -265,12 +277,12 @@ static hg_addr_t pymargo_addr_self(
         exit(-1);
     }
     // TODO throw an exception if the return value is not  HG_SUCCESS
-    return addr;
+    return ADDR2CAPSULE(addr);
 }
 
-static hg_addr_t pymargo_addr_dup(
-        margo_instance_id mid,
-        hg_addr_t addr)
+static pymargo_addr pymargo_addr_dup(
+        pymargo_instance_id mid,
+        pymargo_addr addr)
 {
     hg_addr_t newaddr;
     hg_return_t ret;
@@ -279,12 +291,12 @@ static hg_addr_t pymargo_addr_dup(
         std::cerr << "margo_addr_dup() failed (ret = " << ret << ")" << std::endl;
         exit(-1);
     }
-    return newaddr;
+    return ADDR2CAPSULE(newaddr);
 }
 
 static std::string pymargo_addr_to_string(
-        margo_instance_id mid,
-        hg_addr_t addr)
+        pymargo_instance_id mid,
+        pymargo_addr addr)
 {
     hg_size_t buf_size = 0;
     margo_addr_to_string(mid, NULL, &buf_size, addr);
@@ -297,8 +309,8 @@ static std::string pymargo_addr_to_string(
 }
 
 static pymargo_hg_handle pymargo_create(
-        margo_instance_id mid,
-        hg_addr_t addr,
+        pymargo_instance_id mid,
+        pymargo_addr addr,
         hg_id_t id)
 {
     hg_handle_t handle;
@@ -311,11 +323,6 @@ static pymargo_hg_handle pymargo_create(
     // TODO throw an exception if the return value is not  HG_SUCCESS
     pymargo_hg_handle pyhandle(handle);
     return pyhandle;
-}
-
-hg_info pymargo_hg_handle::get_info() const
-{
-    return *margo_get_info(handle);
 }
 
 pymargo_hg_handle::pymargo_hg_handle(const pymargo_hg_handle& other)
@@ -369,16 +376,26 @@ void pymargo_hg_handle::respond(const std::string& output)
     }
 }
 
-margo_instance_id pymargo_hg_handle::get_mid() const
+hg_id_t pymargo_hg_handle::get_id() const
 {
-    return margo_hg_handle_get_instance(handle);
+    auto info = margo_get_info(handle);
+    return info->id;
+}
+
+pymargo_addr pymargo_hg_handle::get_addr() const
+{
+    auto info = margo_get_info(handle);
+    return ADDR2CAPSULE(info->addr);
+}
+
+pymargo_instance_id pymargo_hg_handle::get_mid() const
+{
+    return MID2CAPSULE(margo_hg_handle_get_instance(handle));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
 // ABT namespace
 ///////////////////////////////////////////////////////////////////////////////////
-struct abtns {};
-
 class py_abt_mutex {
         
     ABT_mutex mutex_m;
@@ -479,56 +496,58 @@ static int py_abt_yield() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-BOOST_PYTHON_MODULE(_pymargo)
+PYBIND11_MODULE(_pymargo, m)
 {
-#define ret_policy_opaque bpl::return_value_policy<bpl::return_opaque_pointer>()
-
-    bpl::opaque<margo_instance>();
-    bpl::opaque<hg_addr>();
-    bpl::enum_<pymargo_mode>("mode")
+    py11::enum_<pymargo_mode>(m,"mode")
         .value("client", PYMARGO_CLIENT_MODE)
         .value("server", PYMARGO_SERVER_MODE)
         ;
-    bpl::enum_<pymargo_rpc_mode>("location")
+    py11::enum_<pymargo_rpc_mode>(m,"location")
         .value("in_caller_thread", PYMARGO_IN_CALLER_THREAD)
         .value("in_progress_thread", PYMARGO_IN_PROGRESS_THREAD)
         ;
-    bpl::class_<hg_info>("hg_info", bpl::init<>())
-        .def_readonly("addr", &hg_info::addr)
-        .def_readonly("id", &hg_info::id)
-        ;
-    bpl::class_<pymargo_hg_handle>("MargoHandle", bpl::no_init)
-        .def("get_info",&pymargo_hg_handle::get_info)
+    py11::class_<pymargo_hg_handle>(m,"MargoHandle")
+        .def("get_hg_addr", &pymargo_hg_handle::get_addr)
+        .def("get_id", &pymargo_hg_handle::get_id)
         .def("forward", &pymargo_hg_handle::forward)
         .def("respond", &pymargo_hg_handle::respond)
-        .def("get_mid", &pymargo_hg_handle::get_mid, ret_policy_opaque)
+        .def("get_mid", &pymargo_hg_handle::get_mid)
         ;
 
-    bpl::def("init",                     &pymargo_init, ret_policy_opaque);
-    bpl::def("finalize",                 &margo_finalize);
-    bpl::def("wait_for_finalize",        &margo_wait_for_finalize);
-    bpl::def("push_finalize_callback",   &pymargo_push_finalize_callback);
-    bpl::def("enable_remote_shutdown",   &margo_enable_remote_shutdown);
-    bpl::def("shutdown_remote_instance", &margo_shutdown_remote_instance);
-    bpl::def("register",                 &pymargo_register);
-    bpl::def("register_on_client",       &pymargo_register_on_client);
-    bpl::def("registered",               &pymargo_registered);
-    bpl::def("registered_mplex",         &pymargo_provider_registered);
-    bpl::def("lookup",                   &pymargo_lookup, ret_policy_opaque);
-    bpl::def("addr_free",                &pymargo_addr_free);
-    bpl::def("addr_self",                &pymargo_addr_self, ret_policy_opaque);
-    bpl::def("addr_dup",                 &pymargo_addr_dup, ret_policy_opaque);
-    bpl::def("addr2str",                 &pymargo_addr_to_string);
-    bpl::def("create",                   &pymargo_create);
+    m.def("init",                     &pymargo_init);
+    m.def("finalize", [](pymargo_instance_id mid) {
+            margo_finalize(mid);
+    });
+    m.def("wait_for_finalize",  [](pymargo_instance_id mid) {
+            margo_wait_for_finalize(mid);
+    });
+
+    m.def("push_finalize_callback",   &pymargo_push_finalize_callback);
+    m.def("enable_remote_shutdown", [](pymargo_instance_id mid) {
+            margo_enable_remote_shutdown(mid);
+    });
+    m.def("shutdown_remote_instance", [](pymargo_instance_id mid, pymargo_addr addr) {
+            margo_shutdown_remote_instance(mid, addr);
+    });
+    m.def("register",                 &pymargo_register);
+    m.def("register_on_client",       &pymargo_register_on_client);
+    m.def("registered",               &pymargo_registered);
+    m.def("registered_mplex",         &pymargo_provider_registered);
+    m.def("lookup",                   &pymargo_lookup);
+    m.def("addr_free",                &pymargo_addr_free);
+    m.def("addr_self",                &pymargo_addr_self);
+    m.def("addr_dup",                 &pymargo_addr_dup);
+    m.def("addr2str",                 &pymargo_addr_to_string);
+    m.def("create",                   &pymargo_create);
 
     // Inside abt package
-    bpl::scope abt_package = bpl::class_<abtns>("abt");
-    bpl::def("yield", &py_abt_yield);
-    bpl::class_<py_abt_mutex, boost::noncopyable>("Mutex", bpl::init<>())
-        .def(bpl::init<bool>())
+    py11::module abt_package = m.def_submodule("abt");
+    abt_package.def("yield", &py_abt_yield);
+    py11::class_<py_abt_mutex>(abt_package,"Mutex")
+        .def(py11::init<bool>())
         .def("lock", &py_abt_mutex::lock)
         .def("unlock", &py_abt_mutex::unlock);
-    bpl::class_<py_abt_rwlock, boost::noncopyable>("RWLock", bpl::init<>())
+    py11::class_<py_abt_rwlock>(abt_package, "RWLock")
         .def("rdlock", &py_abt_rwlock::rdlock)
         .def("wrlock", &py_abt_rwlock::wrlock)
         .def("unlock", &py_abt_rwlock::unlock);

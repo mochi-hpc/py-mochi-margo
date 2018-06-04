@@ -3,21 +3,23 @@ from pymargo import Provider
 
 class HelloProvider(Provider):
 
-	def __init__(self, mid, provider_id):
-		super(HelloProvider, self).__init__(mid, provider_id)
-		self.register("say_hello", "hello")
+    def __init__(self, mid, provider_id):
+        super(HelloProvider, self).__init__(mid, provider_id)
+        self.register("say_hello", "hello")
 
-	def hello(self, handle, name):
-		print "Hello from "+name
-		handle.respond("Hi "+name+"!")
-		self.get_margo_instance().finalize()
+    def hello(self, handle, name):
+        print "Hello from "+name
+        print "Sent from address "+str(handle.get_addr())
+        print "RPC id is "+str(handle.get_id())
+        handle.respond("Hi "+name+"!")
+        self.get_margo_instance().finalize()
 
 def WhenFinalize():
-	print "Finalize was called"
+    print "Finalize was called"
 
 mid = MargoInstance('tcp')
 provider_id = 42
-print "Server running at address "+str(mid.addr())+"with provider_id="+str(provider_id)
+print "Server running at address "+str(mid.addr())+" with provider_id="+str(provider_id)
 
 mid.on_finalize(WhenFinalize)
 provider = HelloProvider(mid, provider_id)

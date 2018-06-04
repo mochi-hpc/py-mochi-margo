@@ -16,7 +16,8 @@ class MargoAddress():
         self._need_del = need_del
 
     def __del__(self):
-        _pymargo.addr_free(self._mid, self._hg_addr)
+        if(self._need_del):
+            _pymargo.addr_free(self._mid, self._hg_addr)
 
     def __str__(self):
         return _pymargo.addr2str(self._mid, self._hg_addr)
@@ -29,6 +30,13 @@ class MargoAddress():
 
     def shutdown(self):
         _pymargo.shutdown_remote_instance(self._mid, self._hg_addr)
+
+def __MargoHandler_get_MargoAddress(h):
+    mid =  h.get_mid()
+    addr = h.get_hg_addr()
+    return MargoAddress(mid, addr, need_del=False).copy()
+
+setattr(_pymargo.MargoHandle, "get_addr", __MargoHandler_get_MargoAddress)
 
 class MargoInstance():
 

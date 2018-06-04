@@ -207,7 +207,7 @@ static py11::object pymargo_registered(
     if(flag) {
         return py11::cast(id);
     } else {
-        return py11::object();
+        return py11::none();
     }
 }
 
@@ -231,7 +231,7 @@ static py11::object pymargo_provider_registered(
     if(flag) {
         return py11::cast(id);
     } else {
-        return py11::object();
+        return py11::none();
     }
 }
 

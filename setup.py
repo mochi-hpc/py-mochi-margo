@@ -23,6 +23,7 @@ pymargo_module = Extension('_pymargo', files,
         libraries=libraries,
         library_dirs=library_dirs,
         include_dirs=include_dirs,
+        extra_compile_args=['-std=c++11'],
         depends=[])
 
 setup(name='pymargo',

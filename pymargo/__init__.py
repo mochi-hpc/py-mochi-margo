@@ -44,6 +44,7 @@ class MargoInstance():
             mode=server, 
             use_progress_thread=False,
             rpc_location=in_caller_thread):
+        self._finalized = True
         self._mid = _pymargo.init(addr, mode, use_progress_thread, rpc_location)
         self._finalized = False
 

@@ -7,7 +7,7 @@ It enables one to develop Margo-based service in Python.
 
 * margo (and its dependencies)
 * python
-* boost-python
+* pybind11
 
 ## Installing
 

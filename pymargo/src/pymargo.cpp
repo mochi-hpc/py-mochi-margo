@@ -4,20 +4,28 @@
  * See COPYRIGHT in top-level directory.
  */
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <string>
+#include <sstream>
+#include <stdexcept>
 #include <iostream>
 #include <mercury_proc_string.h>
 #include <margo.h>
+#include "base64.hpp"
 
 namespace py11 = pybind11;
+namespace np = py11;
 
 typedef py11::capsule pymargo_instance_id;
 typedef py11::capsule pymargo_addr;
+typedef py11::capsule pymargo_bulk;
 
 #define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id", nullptr)
 #define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t", nullptr)
+#define BULK2CAPSULE(__blk)  py11::capsule((void*)(__blk), "hg_bulk_t", nullptr)
 #define CAPSULE2MID(__caps)  (margo_instance_id)(__caps)
 #define CAPSULE2ADDR(__caps) (hg_addr_t)(__caps)
+#define CAPSULE2BULK(__caps) (hg_bulk_t)(__caps)
 
 struct __attribute__ ((visibility("hidden"))) pymargo_rpc_data {
     py11::object obj;
@@ -31,10 +39,10 @@ struct pymargo_hg_handle {
     pymargo_hg_handle(const pymargo_hg_handle& other);
     ~pymargo_hg_handle();
     hg_id_t get_id() const;
-    pymargo_addr get_addr() const;
+    pymargo_addr _get_hg_addr() const;
     std::string forward(uint16_t provider_id, const std::string& input);
     void respond(const std::string& output);
-    pymargo_instance_id get_mid() const;
+    pymargo_instance_id _get_mid() const;
 };
 
 void delete_rpc_data(void* arg) {
@@ -52,6 +60,17 @@ enum pymargo_rpc_mode {
     PYMARGO_IN_PROGRESS_THREAD
 };
 
+enum pymargo_bulk_access_mode {
+    PYMARGO_READ_ONLY  = HG_BULK_READ_ONLY,
+    PYMARGO_WRITE_ONLY = HG_BULK_WRITE_ONLY,
+    PYMARGO_READWRITE  = HG_BULK_READWRITE
+};
+
+enum pymargo_bulk_xfer_mode {
+    PYMARGO_PUSH = HG_BULK_PUSH,
+    PYMARGO_PULL = HG_BULK_PULL
+};
+
 static pymargo_instance_id pymargo_init(
         const std::string& addr,
         pymargo_mode mode,
@@ -61,22 +80,25 @@ static pymargo_instance_id pymargo_init(
     int l = loc == PYMARGO_IN_CALLER_THREAD ? 0 : -1;
     if(mode == PYMARGO_CLIENT_MODE) l = 0;
     margo_instance_id mid = margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
+    if(mid == MARGO_INSTANCE_NULL) {
+        throw std::runtime_error("margo_init() returned MARGO_INSTANCE_NULL");
+    }
     return MID2CAPSULE(mid);
 }
 
 static void pymargo_generic_finalize_cb(void* arg)
 {
-    try {
+    //try {
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
         PyObject* pyobj = static_cast<PyObject*>(arg);
-        py11::handle fun(pyobj); 
+        py11::handle fun(pyobj);
         fun();
         PyGILState_Release(gstate);
-    } catch(const py11::error_already_set&) {
-        PyErr_Print();
-        exit(-1);
-    }
+    //} catch(const py11::error_already_set&) {
+    //    PyErr_Print();
+    //    exit(-1);
+    //}
 }
 
 static void pymargo_push_finalize_callback(
@@ -106,7 +128,9 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         result = ret;
         margo_free_input(handle, &input);
         margo_destroy(handle);
-        return result;
+        std::stringstream ss;
+        ss << "margo_get_input() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
 
     pymargo_rpc_data* rpc_data = NULL;
@@ -130,6 +154,9 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         PyGILState_Release(gstate);
     } catch(const py11::error_already_set&) {
         PyErr_Print();
+        result = HG_OTHER_ERROR;
+    } catch(const std::exception& ex) {
+        std::cerr << ex.what();
         exit(-1);
     }
 
@@ -163,10 +190,10 @@ static hg_id_t pymargo_register(
 
     ret = margo_register_data(mid, rpc_id,
                 static_cast<void*>(rpc_data), delete_rpc_data);
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_register_data() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_register_data() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
     return rpc_id;
 }
@@ -183,7 +210,9 @@ static hg_id_t pymargo_register_on_client(
                     rpc_name.c_str(),
                     hg_string_t, hg_string_t, NULL,
                     provider_id, ABT_POOL_NULL);
-    // TODO throw an exception if the return value is not correct
+    if(rpc_id == 0) {
+        throw std::runtime_error("margo_register_provider() return rpc id 0");
+    }
     return rpc_id;
 }
 
@@ -200,10 +229,10 @@ static py11::object pymargo_registered(
             rpc_name.c_str(), &id, &flag);
 
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_registered_name() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_registered_name() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     if(flag) {
         return py11::cast(id);
     } else {
@@ -224,10 +253,10 @@ static py11::object pymargo_provider_registered(
             mid, 
             rpc_name.c_str(), provider_id, &id, &flag);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_registered_name_mplex() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_registered_name_mplex() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     if(flag) {
         return py11::cast(id);
     } else {
@@ -246,10 +275,10 @@ static pymargo_addr pymargo_lookup(
             mid, 
             addrstr.c_str(), &addr);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_addr_lookup() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_addr_lookup() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     return ADDR2CAPSULE(addr);
 }
 
@@ -260,10 +289,10 @@ static void pymargo_addr_free(
     hg_return_t ret;
     ret = margo_addr_free(mid, pyaddr);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_addr_free() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_addr_free() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
 }
 
 static pymargo_addr pymargo_addr_self(
@@ -273,10 +302,10 @@ static pymargo_addr pymargo_addr_self(
     hg_return_t ret;
     ret = margo_addr_self(mid, &addr);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_addr_self() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_addr_self() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     return ADDR2CAPSULE(addr);
 }
 
@@ -288,8 +317,9 @@ static pymargo_addr pymargo_addr_dup(
     hg_return_t ret;
     ret = margo_addr_dup(mid, addr, &newaddr);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_addr_dup() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_addr_dup() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
     return ADDR2CAPSULE(newaddr);
 }
@@ -299,12 +329,20 @@ static std::string pymargo_addr_to_string(
         pymargo_addr addr)
 {
     hg_size_t buf_size = 0;
-    margo_addr_to_string(mid, NULL, &buf_size, addr);
-    // TODO throw an exception if the return value is not  HG_SUCCESS
+    hg_return_t ret = margo_addr_to_string(mid, NULL, &buf_size, addr);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_addr_to_string() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
     std::string result(buf_size,' ');
-    margo_addr_to_string(mid, const_cast<char*>(result.data()), &buf_size, addr);
+    ret = margo_addr_to_string(mid, const_cast<char*>(result.data()), &buf_size, addr);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_addr_to_string() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
     result.resize(buf_size-1);
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     return result;
 }
 
@@ -317,10 +355,10 @@ static pymargo_hg_handle pymargo_create(
     hg_return_t ret;
     ret = margo_create(mid, addr, id, &handle);
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_create() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_create() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     pymargo_hg_handle pyhandle(handle);
     return pyhandle;
 }
@@ -328,8 +366,12 @@ static pymargo_hg_handle pymargo_create(
 pymargo_hg_handle::pymargo_hg_handle(const pymargo_hg_handle& other)
 : handle(other.handle)
 {
-    margo_ref_incr(handle);
-    // TODO throw an exception if the return value is not  HG_SUCCESS
+    hg_return_t ret = margo_ref_incr(handle);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_ref_incr() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
 }
 
 pymargo_hg_handle::~pymargo_hg_handle()
@@ -340,15 +382,31 @@ pymargo_hg_handle::~pymargo_hg_handle()
 std::string pymargo_hg_handle::forward(uint16_t provider_id, const std::string& input)
 {
     hg_string_t instr = const_cast<char*>(input.data());
+    hg_return_t ret;
     Py_BEGIN_ALLOW_THREADS
-    margo_provider_forward(provider_id, handle, &instr);
+    ret = margo_provider_forward(provider_id, handle, &instr);
     Py_END_ALLOW_THREADS
 
-    // TODO throw an exception if the return value is not  HG_SUCCESS
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_provider_forward() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+
     hg_string_t out;
-    margo_get_output(handle, &out);
+    ret = margo_get_output(handle, &out);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_get_output() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
     std::string result(out);
-    margo_free_output(handle, &out);
+    ret = margo_free_output(handle, &out);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_free_output() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
     return result;
 }
 /*
@@ -369,10 +427,10 @@ void pymargo_hg_handle::respond(const std::string& output)
     Py_BEGIN_ALLOW_THREADS
     ret = margo_respond(handle, &out);
     Py_END_ALLOW_THREADS
-    // TODO throw an exception if the return value is not  HG_SUCCESS
     if(ret != HG_SUCCESS) {
-        std::cerr << "margo_respond() failed (ret = " << ret << ")" << std::endl;
-        exit(-1);
+        std::stringstream ss;
+        ss << "margo_respond() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
     }
 }
 
@@ -382,15 +440,140 @@ hg_id_t pymargo_hg_handle::get_id() const
     return info->id;
 }
 
-pymargo_addr pymargo_hg_handle::get_addr() const
+pymargo_addr pymargo_hg_handle::_get_hg_addr() const
 {
     auto info = margo_get_info(handle);
     return ADDR2CAPSULE(info->addr);
 }
 
-pymargo_instance_id pymargo_hg_handle::get_mid() const
+pymargo_instance_id pymargo_hg_handle::_get_mid() const
 {
     return MID2CAPSULE(margo_hg_handle_get_instance(handle));
+}
+
+pymargo_bulk pymargo_bulk_create(
+        pymargo_instance_id mid,
+        const np::array& data,
+        pymargo_bulk_access_mode flags)
+{
+    if(!(data.flags() & (np::array::f_style | np::array::c_style))) {
+        throw std::runtime_error("Non-contiguous numpy arrays not yet supported by PyMargo");
+    }
+    hg_size_t size = data.dtype().itemsize();
+    for(int i = 0; i < data.ndim(); i++) {
+        size *= data.shape(i);
+    }
+    void* buffer = const_cast<void*>(data.data());
+    hg_bulk_t handle;
+    hg_return_t ret = margo_bulk_create(mid, 1, &buffer, &size, flags, &handle);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_create() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+    return BULK2CAPSULE(handle);
+}
+
+void pymargo_bulk_free(pymargo_bulk bulk) {
+    hg_return_t ret = margo_bulk_free(bulk);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_free() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+}
+
+void pymargo_bulk_ref_incr(pymargo_bulk bulk) {
+    hg_return_t ret = margo_bulk_ref_incr(bulk);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_ref_incr() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+}
+
+void pymargo_bulk_transfer(
+        pymargo_instance_id mid,
+        pymargo_bulk_xfer_mode op,
+        pymargo_addr origin_addr,
+        pymargo_bulk origin_handle,
+        size_t origin_offset,
+        pymargo_bulk local_handle,
+        size_t local_offset,
+        size_t size) {
+    
+    hg_return_t ret = margo_bulk_transfer(mid, static_cast<hg_bulk_op_t>(op), origin_addr,
+            origin_handle, origin_offset, local_handle, local_offset, size);
+    
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_transfer() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+}
+
+std::string pymargo_bulk_to_base64(
+        pymargo_bulk handle, bool request_eager) {
+    hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
+    hg_size_t buf_size = margo_bulk_get_serialize_size(handle, flag);
+    std::string raw_buf(buf_size, '\0');
+    hg_return_t ret = margo_bulk_serialize(const_cast<char*>(raw_buf.data()), buf_size, flag, handle);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_serialize() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+    return pymargo_base64_encode(reinterpret_cast<unsigned char const*>(raw_buf.data()), buf_size);
+}
+
+py11::bytes pymargo_bulk_to_str(
+        pymargo_bulk handle, bool request_eager) {
+
+    hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
+    hg_size_t buf_size = margo_bulk_get_serialize_size(handle, flag);
+    std::string raw_buf(buf_size, '\0');
+    hg_return_t ret = margo_bulk_serialize(const_cast<char*>(raw_buf.data()), buf_size, flag, handle);
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_serialize() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+    return raw_buf;
+}
+
+pymargo_bulk pymargo_base64_to_bulk(
+        pymargo_instance_id mid,
+        const std::string& rep) {
+
+    std::string raw = pymargo_base64_decode(rep);
+
+    hg_bulk_t handle;
+    hg_return_t ret = margo_bulk_deserialize(mid, &handle, raw.data(), raw.size());
+
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_deserialize() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+
+    return BULK2CAPSULE(handle);
+}
+
+pymargo_bulk pymargo_str_to_bulk(
+        pymargo_instance_id mid,
+        const py11::bytes& rep) {
+
+    hg_bulk_t handle;
+    std::string str_rep = static_cast<std::string>(rep);
+    hg_return_t ret = margo_bulk_deserialize(mid, &handle, str_rep.data(), str_rep.size());
+
+    if(ret != HG_SUCCESS) {
+        std::stringstream ss;
+        ss << "margo_bulk_deserialize() failed (ret = " << ret << ")";
+        throw std::runtime_error(ss.str());
+    }
+
+    return BULK2CAPSULE(handle);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -498,6 +681,12 @@ static int py_abt_yield() {
 ///////////////////////////////////////////////////////////////////////////////////
 PYBIND11_MODULE(_pymargo, m)
 {
+    try { py11::module::import("numpy"); }
+    catch (...) {
+        std::cerr << "[PyMargo] Error: could not import numpy at C++ level" << std::endl;
+        exit(-1);
+    }
+
     py11::enum_<pymargo_mode>(m,"mode")
         .value("client", PYMARGO_CLIENT_MODE)
         .value("server", PYMARGO_SERVER_MODE)
@@ -506,12 +695,21 @@ PYBIND11_MODULE(_pymargo, m)
         .value("in_caller_thread", PYMARGO_IN_CALLER_THREAD)
         .value("in_progress_thread", PYMARGO_IN_PROGRESS_THREAD)
         ;
-    py11::class_<pymargo_hg_handle>(m,"MargoHandle")
-        .def("get_hg_addr", &pymargo_hg_handle::get_addr)
+    py11::enum_<pymargo_bulk_access_mode>(m, "access")
+        .value("read_only",  PYMARGO_READ_ONLY)
+        .value("write_only", PYMARGO_WRITE_ONLY)
+        .value("read_write", PYMARGO_READWRITE)
+        ;
+    py11::enum_<pymargo_bulk_xfer_mode>(m, "xfer")
+        .value("push", PYMARGO_PUSH)
+        .value("pull", PYMARGO_PULL)
+        ;
+    py11::class_<pymargo_hg_handle>(m,"Handle")
+        .def("_get_hg_addr", &pymargo_hg_handle::_get_hg_addr)
         .def("get_id", &pymargo_hg_handle::get_id)
         .def("forward", &pymargo_hg_handle::forward)
         .def("respond", &pymargo_hg_handle::respond)
-        .def("get_mid", &pymargo_hg_handle::get_mid)
+        .def("_get_mid", &pymargo_hg_handle::_get_mid)
         ;
 
     m.def("init",                     &pymargo_init);
@@ -539,6 +737,15 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("addr_dup",                 &pymargo_addr_dup);
     m.def("addr2str",                 &pymargo_addr_to_string);
     m.def("create",                   &pymargo_create);
+
+    m.def("bulk_create",              &pymargo_bulk_create);
+    m.def("bulk_free",                &pymargo_bulk_free);
+    m.def("bulk_ref_incr",            &pymargo_bulk_ref_incr);
+    m.def("bulk_transfer",            &pymargo_bulk_transfer);
+    m.def("bulk_to_base64",           &pymargo_bulk_to_base64);
+    m.def("base64_to_bulk",           &pymargo_base64_to_bulk);
+    m.def("bulk_to_str",              &pymargo_bulk_to_str);
+    m.def("str_to_bulk",              &pymargo_str_to_bulk);
 
     // Inside abt package
     py11::module abt_package = m.def_submodule("abt");

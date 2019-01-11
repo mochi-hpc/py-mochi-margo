@@ -17,13 +17,13 @@ library_dirs = pk['library_dirs']
 include_dirs = pk['include_dirs']
 include_dirs.append(".")
 
-files = ["pymargo/src/pymargo.cpp"]
+files = ["pymargo/src/pymargo.cpp", "pymargo/src/base64.cpp"]
 
 pymargo_module = Extension('_pymargo', files,
         libraries=libraries,
         library_dirs=library_dirs,
         include_dirs=include_dirs,
-        extra_compile_args=['-std=c++11'],
+        extra_compile_args=['-std=c++11', '-g'],
         depends=[])
 
 setup(name='pymargo',

@@ -1,4 +1,3 @@
-import core
 import _pymargo
 
 """

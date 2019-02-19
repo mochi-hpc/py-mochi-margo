@@ -1,6 +1,6 @@
 # (C) 2018 The University of Chicago
 # See COPYRIGHT in top-level directory.
-import core
+from . import core
 
 client = core.client
 server = core.server

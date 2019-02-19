@@ -1,7 +1,7 @@
 # (C) 2018 The University of Chicago
 # See COPYRIGHT in top-level directory.
 import _pymargo
-from bulk import Bulk
+from .bulk import Bulk
 
 """
 Tags to indicate whether an Engine runs as a server

@@ -75,9 +75,9 @@ static pymargo_instance_id pymargo_init(
         const std::string& addr,
         pymargo_mode mode,
         bool use_progress_thread,
-        pymargo_rpc_mode loc)
+        int num_rpc_threads)
 {
-    int l = loc == PYMARGO_IN_CALLER_THREAD ? 0 : -1;
+    int l = num_rpc_threads;
     if(mode == PYMARGO_CLIENT_MODE) l = 0;
     margo_instance_id mid = margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
     if(mid == MARGO_INSTANCE_NULL) {

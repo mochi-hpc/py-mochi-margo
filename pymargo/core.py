@@ -11,12 +11,6 @@ client = _pymargo.mode.client
 server = _pymargo.mode.server
 
 """
-Tags to indicate where the RPC handlers should execute.
-"""
-in_caller_thread   = _pymargo.location.in_caller_thread
-in_progress_thread = _pymargo.location.in_progress_thread
-
-"""
 Definition of an RPC handle. This class is fully defined
 in the C++ side of the library.
 """
@@ -83,16 +77,16 @@ class Engine():
     def __init__(self, addr, 
             mode=server, 
             use_progress_thread=False,
-            rpc_location=in_caller_thread):
+            num_rpc_threads=0):
         """
         Constructor of the Engine class.
         addr : address of the Engine
         mode : pymargo.core.server or pymargo.core.client
-        use_progress_thread : whether to use a progress thread or not
-        rpc_location : where to call RPC handles
+        use_progress_thread : whether to use a progress execution stream or not
+        num_rpc_threads : Number of RPC execution streams
         """
         self._finalized = True
-        self._mid = _pymargo.init(addr, mode, use_progress_thread, rpc_location)
+        self._mid = _pymargo.init(addr, mode, use_progress_thread, num_rpc_threads)
         self._finalized = False
 
     def __del__(self):

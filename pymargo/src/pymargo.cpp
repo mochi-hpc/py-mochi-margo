@@ -89,12 +89,10 @@ static pymargo_instance_id pymargo_init(
 static void pymargo_generic_finalize_cb(void* arg)
 {
     //try {
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-        PyObject* pyobj = static_cast<PyObject*>(arg);
-        py11::handle fun(pyobj);
-        fun();
-        PyGILState_Release(gstate);
+    py11::gil_scoped_acquire acquire;
+    PyObject* pyobj = static_cast<PyObject*>(arg);
+    py11::handle fun(pyobj);
+    fun();
     //} catch(const py11::error_already_set&) {
     //    PyErr_Print();
     //    exit(-1);
@@ -145,13 +143,11 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 
     std::string out;
     try {
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
+        py11::gil_scoped_acquire acquire;
         pymargo_hg_handle pyhandle(handle);
         margo_ref_incr(handle);
         py11::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
         py11::object r = fun(pyhandle, std::string(input));
-        PyGILState_Release(gstate);
     } catch(const py11::error_already_set&) {
         PyErr_Print();
         result = HG_OTHER_ERROR;
@@ -717,6 +713,7 @@ PYBIND11_MODULE(_pymargo, m)
             margo_finalize(mid);
     });
     m.def("wait_for_finalize",  [](pymargo_instance_id mid) {
+            py11::gil_scoped_release release;
             margo_wait_for_finalize(mid);
     });
 
@@ -725,6 +722,7 @@ PYBIND11_MODULE(_pymargo, m)
             margo_enable_remote_shutdown(mid);
     });
     m.def("shutdown_remote_instance", [](pymargo_instance_id mid, pymargo_addr addr) {
+            py11::gil_scoped_release release;
             margo_shutdown_remote_instance(mid, addr);
     });
     m.def("register",                 &pymargo_register);

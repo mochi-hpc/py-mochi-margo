@@ -211,6 +211,12 @@ class Engine():
         _pymargo.bulk_transfer(self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
                 origin_offset, local_handle._hg_bulk, local_offset, size)
 
+    def get_internal_mid(self):
+        """
+        Returns the internal margo_instance_id.
+        """
+        return self._mid
+
 class Provider(object):
     """
     The Provider class represents an object for which some methods can be called remotely.

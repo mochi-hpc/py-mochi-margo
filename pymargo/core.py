@@ -161,10 +161,10 @@ class Engine():
         RPC id if found, None otherwise. If provider_id is given, the returned RPC id will
         integrate it.
         """
-        if mplex_id is None:
+        if provider_id is None:
             return _pymargo.registered(self._mid, rpc_name) 
         else:
-            return _pymargo.registered_mplex(self._mid, rpc_name, provider_id)
+            return _pymargo.registered_provider(self._mid, rpc_name, provider_id)
 
     def lookup(self, straddr):
         """
@@ -237,7 +237,7 @@ class Provider(object):
         rpc_name : string to use by clients to identify this RPC
         method_name : string representation of the method to call in this object.
         """
-        self._engine.register(rpc_name, self, method_name, self._provider_id)
+        return self._engine.register(rpc_name, self, method_name, self._provider_id)
 
     def registered(self, rpc_name):
         """
@@ -250,12 +250,6 @@ class Provider(object):
         Returns this provider's id.
         """
         return self._provider_id
-
-    def get_margo_instance(self):
-        """
-        Deprecated. Use get_engine.
-        """
-        return self._engine
 
     def get_engine(self):
         """

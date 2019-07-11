@@ -1,5 +1,4 @@
 import sys
-sys.path.append('build/lib.linux-x86_64-2.7')
 import numpy as np
 from pymargo.core import Engine, Provider
 import pymargo.bulk
@@ -7,8 +6,8 @@ from pymargo.bulk import Bulk
 
 class HelloProvider(Provider):
 
-    def __init__(self, mid, provider_id):
-        super(HelloProvider, self).__init__(mid, provider_id)
+    def __init__(self, engine, provider_id):
+        super().__init__(engine, provider_id)
         self.register("send_array", "process_array")
 
     def process_array(self, handle, bulk_str):
@@ -35,11 +34,11 @@ class HelloProvider(Provider):
 def WhenFinalize():
     print "Finalize was called"
 
-mid = Engine('tcp')
+engine = Engine('tcp')
 provider_id = 42
-print "Server running at address " + str(mid.addr()) + " with provider_id " + str(provider_id)
+print "Server running at address " + str(engine.addr()) + " with provider_id " + str(provider_id)
 
-mid.on_finalize(WhenFinalize)
-provider = HelloProvider(mid, provider_id)
+engine.on_finalize(WhenFinalize)
+provider = HelloProvider(engine, provider_id)
 
-mid.wait_for_finalize()
+engine.wait_for_finalize()

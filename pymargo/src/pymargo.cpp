@@ -88,15 +88,10 @@ static pymargo_instance_id pymargo_init(
 
 static void pymargo_generic_finalize_cb(void* arg)
 {
-    //try {
     py11::gil_scoped_acquire acquire;
     PyObject* pyobj = static_cast<PyObject*>(arg);
     py11::handle fun(pyobj);
     fun();
-    //} catch(const py11::error_already_set&) {
-    //    PyErr_Print();
-    //    exit(-1);
-    //}
 }
 
 static void pymargo_push_finalize_callback(
@@ -142,14 +137,14 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
     }
 
     std::string out;
+    py11::gil_scoped_acquire acquire;
     try {
-        py11::gil_scoped_acquire acquire;
         pymargo_hg_handle pyhandle(handle);
         margo_ref_incr(handle);
         py11::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
         py11::object r = fun(pyhandle, std::string(input));
-    } catch(const py11::error_already_set&) {
-        PyErr_Print();
+    } catch(const py11::error_already_set& e) {
+        std::cerr << "[Py-Margo] ERROR: " << e.what() << std::endl;
         result = HG_OTHER_ERROR;
     } catch(const std::exception& ex) {
         std::cerr << ex.what();
@@ -728,7 +723,7 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("register",                 &pymargo_register);
     m.def("register_on_client",       &pymargo_register_on_client);
     m.def("registered",               &pymargo_registered);
-    m.def("registered_mplex",         &pymargo_provider_registered);
+    m.def("registered_provider",      &pymargo_provider_registered);
     m.def("lookup",                   &pymargo_lookup);
     m.def("addr_free",                &pymargo_addr_free);
     m.def("addr_self",                &pymargo_addr_self);

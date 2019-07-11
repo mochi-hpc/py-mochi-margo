@@ -1,14 +1,13 @@
 import sys
-sys.path.append('build/lib.linux-x86_64-2.7')
 import numpy as np
 import pymargo
 from pymargo.core import Engine
 import pymargo.bulk as bulk
 
 def call_rpc_on(engine, rpc_id, addr_str, provider_id, array_str):
-	addr = engine.lookup(addr_str)
-	handle = engine.create_handle(addr, rpc_id)
-	return handle.forward(provider_id, array_str)
+    addr = engine.lookup(addr_str)
+    handle = engine.create_handle(addr, rpc_id)
+    return handle.forward(provider_id, array_str)
 
 with Engine('tcp', mode=pymargo.client) as engine:
     rpc_id = engine.register("send_array")

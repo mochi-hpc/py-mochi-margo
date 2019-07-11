@@ -18,3 +18,4 @@ with Engine('tcp', mode=pymargo.client) as engine:
     s = blk.to_base64()
     print("bulk converted to base64: " + s)
     call_rpc_on(engine, rpc_id, sys.argv[1], int(sys.argv[2]), s)
+    del blk

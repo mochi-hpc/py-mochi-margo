@@ -32,11 +32,11 @@ class HelloProvider(Provider):
         engine.finalize()
 
 def WhenFinalize():
-    print "Finalize was called"
+    print("Finalize was called")
 
 engine = Engine('tcp')
 provider_id = 42
-print "Server running at address " + str(engine.addr()) + " with provider_id " + str(provider_id)
+print("Server running at address " + str(engine.addr()) + " with provider_id " + str(provider_id))
 
 engine.on_finalize(WhenFinalize)
 provider = HelloProvider(engine, provider_id)

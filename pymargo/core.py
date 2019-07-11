@@ -59,6 +59,12 @@ class Address():
         """
         _pymargo.shutdown_remote_instance(self._mid, self._hg_addr)
 
+    def get_internal_hg_addr(self):
+        """
+        Get the internal hg_addr handle.
+        """
+        return self._hg_addr
+
 def __Handler_get_Address(h):
     """
     This function gets the address of a the sender of a Handle.

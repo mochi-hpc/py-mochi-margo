@@ -132,6 +132,14 @@ class Engine():
         _pymargo.wait_for_finalize(self._mid)
         self._finalized = True
 
+    def on_prefinalize(self, callable_obj):
+        """
+        Registers a callback (i.e. a function or an object with a __call__ method)
+        to be called before the Engine is finalized and before the Mercury progress
+        loop is terminated.
+        """
+        _pymargo.push_prefinalize_callback(self._mid, callable_obj)
+
     def on_finalize(self, callable_obj):
         """
         Registers a callback (i.e. a function or an object with a __call__ method)

@@ -105,6 +105,17 @@ static void pymargo_push_finalize_callback(
             static_cast<void*>(cb.ptr()));
 }
 
+static void pymargo_push_prefinalize_callback(
+        pymargo_instance_id mid,
+        py11::object cb)
+{
+    Py_INCREF(cb.ptr());
+    margo_push_prefinalize_callback(
+            mid, 
+            &pymargo_generic_finalize_cb,
+            static_cast<void*>(cb.ptr()));
+}
+
 static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 {
     hg_return_t result         = HG_SUCCESS;
@@ -713,6 +724,7 @@ PYBIND11_MODULE(_pymargo, m)
     });
 
     m.def("push_finalize_callback",   &pymargo_push_finalize_callback);
+    m.def("push_prefinalize_callback",   &pymargo_push_prefinalize_callback);
     m.def("enable_remote_shutdown", [](pymargo_instance_id mid) {
             margo_enable_remote_shutdown(mid);
     });

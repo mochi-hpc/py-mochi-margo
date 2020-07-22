@@ -23,13 +23,17 @@ include_dirs = pk['include_dirs']
 include_dirs.append(".")
 include_dirs.append(get_pybind11_include())
 
+extra_compile_args=['-std=c++11', '-g']
+if sys.platform == 'darwin':
+    extra_compile_args.append('-mmacosx-version-min=10.9')
+
 files = ["pymargo/src/pymargo.cpp", "pymargo/src/base64.cpp"]
 
 pymargo_module = Extension('_pymargo', files,
         libraries=libraries,
         library_dirs=library_dirs,
         include_dirs=include_dirs,
-        extra_compile_args=['-std=c++11', '-g'],
+        extra_compile_args=extra_compile_args,
         depends=[])
 
 setup(name='pymargo',

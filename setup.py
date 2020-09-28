@@ -7,10 +7,6 @@ import os
 import os.path
 import sys
 
-def get_pybind11_include():
-    path = os.path.dirname(pybind11.__file__)
-    return '/'.join(path.split('/')[0:-4] + ['include'])
-
 (opt,) = get_config_vars('OPT')
 os.environ['OPT'] = " ".join(
 		    flag for flag in opt.split() if flag != '-Wstrict-prototypes'
@@ -21,7 +17,7 @@ libraries = pk['libraries']
 library_dirs = pk['library_dirs'] 
 include_dirs = pk['include_dirs']
 include_dirs.append(".")
-include_dirs.append(get_pybind11_include())
+include_dirs.append(pybind11.get_include())
 
 extra_compile_args=['-std=c++11', '-g']
 if sys.platform == 'darwin':

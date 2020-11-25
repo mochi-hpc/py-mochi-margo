@@ -100,7 +100,7 @@ class Engine():
         Destructor. Will call finalize it has not been called yet.
         """
         if not self._finalized:
-            _pymargo.finalize(self._mid);
+            self.finalize()
 
     def __enter__(self):
         """
@@ -116,7 +116,8 @@ class Engine():
         """
         See __enter__.
         """
-        pass
+        if not self._finalized:
+            self.finalize()
 
     def finalize(self):
         """

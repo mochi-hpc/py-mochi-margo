@@ -1,6 +1,7 @@
 # (C) 2018 The University of Chicago
 # See COPYRIGHT in top-level directory.
 import _pymargo
+import json
 from .bulk import Bulk
 
 """

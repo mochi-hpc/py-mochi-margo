@@ -80,19 +80,25 @@ setattr(_pymargo.Handle, "get_addr", __Handler_get_Address)
 
 class Engine():
 
-    def __init__(self, addr, 
-            mode=server, 
+    def __init__(self, addr,
+            mode=server,
             use_progress_thread=False,
-            num_rpc_threads=0):
+            num_rpc_threads=0,
+            options=""):
         """
         Constructor of the Engine class.
         addr : address of the Engine
         mode : pymargo.core.server or pymargo.core.client
         use_progress_thread : whether to use a progress execution stream or not
         num_rpc_threads : Number of RPC execution streams
+        options : options dictionary (or serialized in json)
         """
         self._finalized = True
-        self._mid = _pymargo.init(addr, mode, use_progress_thread, num_rpc_threads)
+        if isinstance(options, dict):
+            opt = json.dumps(options)
+        else:
+            opt = options
+        self._mid = _pymargo.init(addr, mode, use_progress_thread, num_rpc_threads, opt)
         self._finalized = False
 
     def __del__(self):

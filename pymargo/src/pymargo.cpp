@@ -1,6 +1,6 @@
 /*
  * (C) 2018 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
 #include <pybind11/pybind11.h>
@@ -75,11 +75,20 @@ static pymargo_instance_id pymargo_init(
         const std::string& addr,
         pymargo_mode mode,
         bool use_progress_thread,
-        int num_rpc_threads)
+        int num_rpc_threads,
+        const std::string& config)
 {
     int l = num_rpc_threads;
     if(mode == PYMARGO_CLIENT_MODE) l = 0;
-    margo_instance_id mid = margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
+    margo_instance_id mid;
+    if(config.empty()) {
+        mid = margo_init(addr.c_str(), mode, (int)use_progress_thread, l);
+    } else {
+        struct margo_init_info info;
+        std::memset(&info, 0, sizeof(info));
+        info.json_config = config.c_str();
+        mid = margo_init_ext(addr.c_str(), mode, &info);
+    }
     if(mid == MARGO_INSTANCE_NULL) {
         throw std::runtime_error("margo_init() returned MARGO_INSTANCE_NULL");
     }

@@ -211,8 +211,10 @@ class Engine():
 
     def create_bulk(self, array, mode):
         """
-        Creates a bulk handle to expose the memory used by the provided numpy array.
-        The numpy array's memory must be contiguous.
+        Creates a bulk handle to expose the memory used by the provided array
+        (which can be any python type that satisfies the buffer protocol,
+        e.g. a bytearray or a numpy array, for instance).
+        The array's memory must be contiguous.
         mode must be bulk.read_only, bulk.write_only, or bulk.read_write.
         Returns a Bulk object.
         """

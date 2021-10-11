@@ -4,7 +4,6 @@
  * See COPYRIGHT in top-level directory.
  */
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -109,7 +108,7 @@ static void pymargo_push_finalize_callback(
 {
     Py_INCREF(cb.ptr());
     margo_push_finalize_callback(
-            mid, 
+            mid,
             &pymargo_generic_finalize_cb,
             static_cast<void*>(cb.ptr()));
 }
@@ -120,7 +119,7 @@ static void pymargo_push_prefinalize_callback(
 {
     Py_INCREF(cb.ptr());
     margo_push_prefinalize_callback(
-            mid, 
+            mid,
             &pymargo_generic_finalize_cb,
             static_cast<void*>(cb.ptr()));
 }
@@ -462,19 +461,25 @@ pymargo_instance_id pymargo_hg_handle::_get_mid() const
     return MID2CAPSULE(margo_hg_handle_get_instance(handle));
 }
 
+#define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
+    ssize_t __stride__ = (__buf_info__).itemsize;     \
+    for(ssize_t i=0; i < (__buf_info__).ndim; i++) {  \
+        if(__stride__ != (__buf_info__).strides[i])   \
+            throw std::runtime_error("Non-contiguous arrays not yet supported by PyMargo"); \
+        __stride__ *= (__buf_info__).shape[i];        \
+    }                                                 \
+} while(0)
+
 pymargo_bulk pymargo_bulk_create(
         pymargo_instance_id mid,
-        const np::array& data,
+        const py11::buffer& data,
         pymargo_bulk_access_mode flags)
 {
-    if(!(data.flags() & (np::array::f_style | np::array::c_style))) {
-        throw std::runtime_error("Non-contiguous numpy arrays not yet supported by PyMargo");
-    }
-    hg_size_t size = data.dtype().itemsize();
-    for(int i = 0; i < data.ndim(); i++) {
-        size *= data.shape(i);
-    }
-    void* buffer = const_cast<void*>(data.data());
+    py11::buffer_info buf_info = data.request();
+    CHECK_BUFFER_IS_CONTIGUOUS(buf_info);
+
+    hg_size_t size = buf_info.itemsize * buf_info.size;
+    void* buffer = const_cast<void*>(buf_info.ptr);
     hg_bulk_t handle;
     hg_return_t ret = margo_bulk_create(mid, 1, &buffer, &size, flags, &handle);
     if(ret != HG_SUCCESS) {
@@ -692,12 +697,6 @@ static int py_abt_yield() {
 ///////////////////////////////////////////////////////////////////////////////////
 PYBIND11_MODULE(_pymargo, m)
 {
-    try { py11::module::import("numpy"); }
-    catch (...) {
-        std::cerr << "[PyMargo] Error: could not import numpy at C++ level" << std::endl;
-        exit(-1);
-    }
-
     py11::enum_<pymargo_mode>(m,"mode")
         .value("client", PYMARGO_CLIENT_MODE)
         .value("server", PYMARGO_SERVER_MODE)

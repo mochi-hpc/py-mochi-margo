@@ -3,6 +3,7 @@ spack:
   - mochi-margo
   - py-pkgconfig
   - py-pybind11
+  - py-setuptools
   concretizer:
     unify: true
     reuse: false

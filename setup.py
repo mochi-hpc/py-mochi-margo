@@ -1,6 +1,5 @@
-from distutils.core import setup
-from distutils.extension import Extension
-from distutils.sysconfig import get_config_vars
+from setuptools import setup, Extension
+from sysconfig import get_config_vars
 import pybind11
 import pkgconfig
 import os
@@ -9,8 +8,8 @@ import sys
 
 (opt,) = get_config_vars('OPT')
 os.environ['OPT'] = " ".join(
-		    flag for flag in opt.split() if flag != '-Wstrict-prototypes'
-		)
+    flag for flag in opt.split() if flag != '-Wstrict-prototypes'
+)
 
 pk = pkgconfig.parse('margo')
 libraries = pk['libraries']

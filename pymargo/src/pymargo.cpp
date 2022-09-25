@@ -260,7 +260,7 @@ static py11::object pymargo_provider_registered(
     hg_return_t ret;
 
     ret = margo_provider_registered_name(
-            mid, 
+            mid,
             rpc_name.c_str(), provider_id, &id, &flag);
     if(ret != HG_SUCCESS) {
         std::stringstream ss;
@@ -282,7 +282,7 @@ static pymargo_addr pymargo_lookup(
     hg_return_t ret;
 
     ret = margo_addr_lookup(
-            mid, 
+            mid,
             addrstr.c_str(), &addr);
     if(ret != HG_SUCCESS) {
         std::stringstream ss;
@@ -517,10 +517,10 @@ void pymargo_bulk_transfer(
         pymargo_bulk local_handle,
         size_t local_offset,
         size_t size) {
-    
+
     hg_return_t ret = margo_bulk_transfer(mid, static_cast<hg_bulk_op_t>(op), origin_addr,
             origin_handle, origin_offset, local_handle, local_offset, size);
-    
+
     if(ret != HG_SUCCESS) {
         std::stringstream ss;
         ss << "margo_bulk_transfer() failed (ret = " << ret << ")";
@@ -596,7 +596,7 @@ pymargo_bulk pymargo_str_to_bulk(
 // ABT namespace
 ///////////////////////////////////////////////////////////////////////////////////
 class py_abt_mutex {
-        
+
     ABT_mutex mutex_m;
 
     public:
@@ -640,7 +640,7 @@ class py_abt_mutex {
 };
 
 class py_abt_rwlock {
-        
+
     ABT_rwlock lock_m;
 
     public:
@@ -695,8 +695,78 @@ static int py_abt_yield() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
+// Logging
+///////////////////////////////////////////////////////////////////////////////////
+
+static int pymargo_set_global_logger(py11::object logger) {
+    auto m = py11::module_::import("_pymargo");
+    m.attr("__global_logger__") = logger;
+#define LOG_FN(__level__)                           \
+    [](void*, const char* msg) {                    \
+        auto m = py11::module_::import("_pymargo"); \
+        auto logger = m.attr("__global_logger__");  \
+        logger.attr(#__level__)(msg);               \
+    }
+
+    margo_logger lgr = {
+        nullptr,
+        LOG_FN(trace),
+        LOG_FN(debug),
+        LOG_FN(info),
+        LOG_FN(warning),
+        LOG_FN(error),
+        LOG_FN(critical)
+    };
+
+    return margo_set_global_logger(&lgr);
+}
+
+static void pymargo_trace(const char* msg) {
+    margo_trace(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_debug(const char* msg) {
+    margo_debug(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_info(const char* msg) {
+    margo_info(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_warning(const char* msg) {
+    margo_warning(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_error(const char* msg) {
+    margo_error(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_critical(const char* msg) {
+    margo_critical(MARGO_INSTANCE_NULL, msg);
+}
+
+///////////////////////////////////////////////////////////////////////////////////
 PYBIND11_MODULE(_pymargo, m)
 {
+    py11::enum_<margo_log_level>(m, "log_level")
+        .value("external", MARGO_LOG_EXTERNAL)
+        .value("trace", MARGO_LOG_TRACE)
+        .value("debug", MARGO_LOG_DEBUG)
+        .value("info", MARGO_LOG_INFO)
+        .value("warning", MARGO_LOG_WARNING)
+        .value("error", MARGO_LOG_ERROR)
+        .value("critical", MARGO_LOG_CRITICAL)
+        ;
+    m.def("set_global_logger", pymargo_set_global_logger)
+     .def("set_global_log_level", margo_set_global_log_level)
+     .def("trace", pymargo_trace)
+     .def("debug", pymargo_debug)
+     .def("info", pymargo_info)
+     .def("warning", pymargo_warning)
+     .def("error", pymargo_error)
+     .def("critical", pymargo_critical)
+     ;
+
     py11::enum_<pymargo_mode>(m,"mode")
         .value("client", PYMARGO_CLIENT_MODE)
         .value("server", PYMARGO_SERVER_MODE)

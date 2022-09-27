@@ -19,6 +19,11 @@ in the C++ side of the library.
 """
 Handle = _pymargo.Handle
 
+"""
+Exception raised by most of the pymargo C++ functions.
+"""
+MargoException = _pymargo.MargoException
+
 class Address:
     """
     Address class, represents the network address of an Engine.

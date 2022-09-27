@@ -1,6 +1,6 @@
 import sys
 import unittest
-from pymargo.core import Engine, Provider
+from pymargo.core import Engine, Provider, MargoException
 
 class HelloProvider(Provider):
 
@@ -41,7 +41,7 @@ class TestProvider(unittest.TestCase):
         provider = HelloProvider(TestProvider._engine, 4)
         addr = TestProvider._engine.lookup('tcp://127.0.0.1:1234')
         handle = TestProvider._engine.create_handle(addr, provider.rpc_id)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(MargoException):
             resp = handle.forward(55, 'Matthieu')
 
 if __name__ == '__main__':

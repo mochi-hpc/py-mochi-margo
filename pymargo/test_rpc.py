@@ -5,7 +5,7 @@ from pymargo.core import Engine, Address, Handle
 class Receiver():
 
     def hello_world(self, handle, name):
-        handle.respond('Hello '+name)
+        handle.respond(b'Hello '+name)
 
 
 class TestRPC(unittest.TestCase):
@@ -38,8 +38,8 @@ class TestRPC(unittest.TestCase):
     def test_forward(self):
         addr = TestRPC.engine.lookup(TestRPC.addr)
         handle = TestRPC.engine.create_handle(addr, TestRPC.rpc_id)
-        resp = handle.forward(0, 'Matthieu')
-        self.assertEqual(resp, 'Hello Matthieu')
+        resp = handle.forward(0, b'Matthieu')
+        self.assertEqual(resp, b'Hello Matthieu')
 
 
 if __name__ == '__main__':

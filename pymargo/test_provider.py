@@ -9,7 +9,7 @@ class HelloProvider(Provider):
         self.rpc_id = self.register('hello_world', 'hello')
 
     def hello(self, handle, name):
-        handle.respond('Hello '+name)
+        handle.respond(b'Hello '+name)
 
 
 class TestProvider(unittest.TestCase):
@@ -35,15 +35,15 @@ class TestProvider(unittest.TestCase):
         provider = HelloProvider(TestProvider.engine, 3)
         addr = TestProvider.engine.address
         handle = TestProvider.engine.create_handle(addr, provider.rpc_id)
-        resp = handle.forward(3, 'Matthieu')
-        self.assertEqual(resp, 'Hello Matthieu')
+        resp = handle.forward(3, b'Matthieu')
+        self.assertEqual(resp, b'Hello Matthieu')
 
     def test_provider_forward_fail(self):
         provider = HelloProvider(TestProvider.engine, 4)
         addr = TestProvider.engine.address
         handle = TestProvider.engine.create_handle(addr, provider.rpc_id)
         with self.assertRaises(MargoException):
-            handle.forward(55, 'Matthieu')
+            handle.forward(55, b'Matthieu')
 
 
 if __name__ == '__main__':

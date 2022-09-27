@@ -6,21 +6,23 @@ class TestAddr(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._engine = Engine('tcp://localhost:1234')
+        cls.engine = Engine('na+sm')
 
     @classmethod
     def tearDownClass(cls):
-        cls._engine.finalize()
+        cls.engine.finalize()
 
     def test_engine_addr(self):
-        addr = TestAddr._engine.addr()
+        addr = TestAddr.engine.addr()
+        self.assertIsInstance(addr, Address)
+        addr = TestAddr.engine.address
         self.assertIsInstance(addr, Address)
 
     def test_addr_str(self):
-        addr = TestAddr._engine.addr()
+        addr = TestAddr.engine.addr()
         addr_str = str(addr)
         self.assertIsInstance(addr_str, str)
-        self.assertTrue(':1234' in addr_str) 
+        self.assertTrue('na+sm' in addr_str)
 
 if __name__ == '__main__':
     unittest.main()

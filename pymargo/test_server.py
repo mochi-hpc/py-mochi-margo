@@ -5,7 +5,7 @@ from pymargo.core import Engine
 class TestInitEngine(unittest.TestCase):
 
     def test_init_engine(self):
-        engine = Engine('tcp')
+        engine = Engine('na+sm')
         self.assertIsInstance(engine, Engine)
         engine.finalize()
 
@@ -24,12 +24,11 @@ class TestInitEngine(unittest.TestCase):
     def test_on_finalize(self):
         finalize_callback = TestInitEngine.FinalizeCallback()
         self.assertFalse(finalize_callback.finalize_was_called)
-        engine = Engine('tcp')
+        engine = Engine('na+sm')
         engine.on_finalize(finalize_callback)
         self.assertFalse(finalize_callback.finalize_was_called)
         engine.finalize()
         self.assertTrue(finalize_callback.finalize_was_called)
-        
 
 if __name__ == '__main__':
     unittest.main()

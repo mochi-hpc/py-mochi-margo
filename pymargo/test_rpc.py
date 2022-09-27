@@ -11,30 +11,31 @@ class TestRPC(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._receiver = Receiver()
-        cls._engine = Engine('tcp://127.0.0.1:1234')
-        cls._rpc_id = cls._engine.register('hello_world', cls._receiver, 'hello_world')
+        cls.receiver = Receiver()
+        cls.engine = Engine('na+sm')
+        cls.rpc_id = cls.engine.register('hello_world', cls.receiver, 'hello_world')
+        cls.addr = str(cls.engine.address)
 
     @classmethod
     def tearDownClass(cls):
-        cls._engine.finalize()
+        cls.engine.finalize()
 
     def test_registered(self):
-        self.assertTrue(TestRPC._engine.registered('hello_world'))
-        self.assertFalse(TestRPC._engine.registered('other'))
+        self.assertTrue(TestRPC.engine.registered('hello_world'))
+        self.assertFalse(TestRPC.engine.registered('other'))
 
     def test_lookup(self):
-        addr = TestRPC._engine.lookup('tcp://127.0.0.1:1234')
+        addr = TestRPC.engine.lookup(TestRPC.addr)
         self.assertIsInstance(addr, Address)
 
     def test_create_handle(self):
-        addr = TestRPC._engine.lookup('tcp://127.0.0.1:1234')
-        handle = TestRPC._engine.create_handle(addr, TestRPC._rpc_id)
+        addr = TestRPC.engine.lookup(TestRPC.addr)
+        handle = TestRPC.engine.create_handle(addr, TestRPC.rpc_id)
         self.assertIsInstance(handle, Handle)
 
     def test_forward(self):
-        addr = TestRPC._engine.lookup('tcp://127.0.0.1:1234')
-        handle = TestRPC._engine.create_handle(addr, TestRPC._rpc_id)
+        addr = TestRPC.engine.lookup(TestRPC.addr)
+        handle = TestRPC.engine.create_handle(addr, TestRPC.rpc_id)
         resp = handle.forward(0, 'Matthieu')
         self.assertEqual(resp, 'Hello Matthieu')
 

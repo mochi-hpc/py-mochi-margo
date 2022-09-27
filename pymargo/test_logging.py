@@ -43,13 +43,11 @@ class TestLogger(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        pass
-        #cls._engine = Engine('tcp://localhost:1234')
+        cls.engine = Engine('na+sm')
 
     @classmethod
     def tearDownClass(cls):
-        pass
-        #cls._engine.finalize()
+        cls.engine.finalize()
 
     def test_global_logger(self):
         logger = MyLogger()
@@ -62,6 +60,25 @@ class TestLogger(unittest.TestCase):
         pymargo.logging.warning("DDD")
         pymargo.logging.error("EEE")
         pymargo.logging.critical("FFF")
+
+        self.assertIsNone(logger.content['trace'])
+        self.assertIsNone(logger.content['debug'])
+        self.assertEqual(logger.content['info'], "CCC")
+        self.assertEqual(logger.content['warning'], "DDD")
+        self.assertEqual(logger.content['error'], "EEE")
+        self.assertEqual(logger.content['critical'], "FFF")
+
+    def test_instance_logger(self):
+        logger = MyLogger()
+        self.engine.logger.set_logger(logger)
+        self.engine.logger.set_log_level(pymargo.logging.level.info)
+
+        self.engine.logger.trace("AAA")
+        self.engine.logger.debug("BBB")
+        self.engine.logger.info("CCC")
+        self.engine.logger.warning("DDD")
+        self.engine.logger.error("EEE")
+        self.engine.logger.critical("FFF")
 
         self.assertIsNone(logger.content['trace'])
         self.assertIsNone(logger.content['debug'])

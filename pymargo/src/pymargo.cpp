@@ -15,6 +15,8 @@
 namespace py11 = pybind11;
 namespace np = py11;
 
+using namespace pybind11::literals;
+
 typedef py11::capsule pymargo_instance_id;
 typedef py11::capsule pymargo_addr;
 typedef py11::capsule pymargo_bulk;
@@ -704,6 +706,7 @@ static int pymargo_set_global_logger(py11::object logger) {
 #define LOG_FN(__level__)                           \
     [](void*, const char* msg) {                    \
         auto m = py11::module_::import("_pymargo"); \
+        if(!hasattr(m, "__global_logger__")) return;\
         auto logger = m.attr("__global_logger__");  \
         logger.attr(#__level__)(msg);               \
     }
@@ -717,32 +720,86 @@ static int pymargo_set_global_logger(py11::object logger) {
         LOG_FN(error),
         LOG_FN(critical)
     };
+#undef LOG_FN
 
     return margo_set_global_logger(&lgr);
+}
+
+static int pymargo_set_logger(py11::object engine, py11::object logger) {
+    engine.attr("_internal_logger") = logger;
+#define LOG_FN(__level__)                              \
+    [](void* e, const char* msg) {                     \
+        auto engine = py11::handle((PyObject*)e);      \
+        if(!hasattr(engine,"_internal_logger")) return;\
+        auto logger = engine.attr("_internal_logger"); \
+        logger.attr(#__level__)(msg);                  \
+    }
+
+    margo_logger lgr = {
+        (void*)engine.ptr(),
+        LOG_FN(trace),
+        LOG_FN(debug),
+        LOG_FN(info),
+        LOG_FN(warning),
+        LOG_FN(error),
+        LOG_FN(critical)
+    };
+#undef LOG_FN
+    pymargo_instance_id mid = engine.attr("_mid");
+
+    return margo_set_logger(mid, &lgr);
+}
+
+static int pymargo_set_log_level(pymargo_instance_id mid, margo_log_level level) {
+    return margo_set_log_level(mid, level);
 }
 
 static void pymargo_trace(const char* msg) {
     margo_trace(MARGO_INSTANCE_NULL, msg);
 }
 
+static void pymargo_trace(const char* msg, pymargo_instance_id mid) {
+    margo_trace(mid, msg);
+}
+
 static void pymargo_debug(const char* msg) {
     margo_debug(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_debug(const char* msg, pymargo_instance_id mid) {
+    margo_debug(mid, msg);
 }
 
 static void pymargo_info(const char* msg) {
     margo_info(MARGO_INSTANCE_NULL, msg);
 }
 
+static void pymargo_info(const char* msg, pymargo_instance_id mid) {
+    margo_info(mid, msg);
+}
+
 static void pymargo_warning(const char* msg) {
     margo_warning(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_warning(const char* msg, pymargo_instance_id mid) {
+    margo_warning(mid, msg);
 }
 
 static void pymargo_error(const char* msg) {
     margo_error(MARGO_INSTANCE_NULL, msg);
 }
 
+static void pymargo_error(const char* msg, pymargo_instance_id mid) {
+    margo_error(mid, msg);
+}
+
 static void pymargo_critical(const char* msg) {
     margo_critical(MARGO_INSTANCE_NULL, msg);
+}
+
+static void pymargo_critical(const char* msg, pymargo_instance_id mid) {
+    margo_critical(mid, msg);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -758,13 +815,21 @@ PYBIND11_MODULE(_pymargo, m)
         .value("critical", MARGO_LOG_CRITICAL)
         ;
     m.def("set_global_logger", pymargo_set_global_logger)
+     .def("set_logger", pymargo_set_logger)
      .def("set_global_log_level", margo_set_global_log_level)
-     .def("trace", pymargo_trace)
-     .def("debug", pymargo_debug)
-     .def("info", pymargo_info)
-     .def("warning", pymargo_warning)
-     .def("error", pymargo_error)
-     .def("critical", pymargo_critical)
+     .def("set_log_level", pymargo_set_log_level)
+     .def("trace", (void(*)(const char*))pymargo_trace, "message"_a)
+     .def("trace", (void(*)(const char*, pymargo_instance_id))pymargo_trace, "message"_a, "mid"_a)
+     .def("debug", (void(*)(const char*))pymargo_debug, "message"_a)
+     .def("debug", (void(*)(const char*, pymargo_instance_id))pymargo_debug, "message"_a, "mid"_a)
+     .def("info", (void(*)(const char*))pymargo_info, "message"_a)
+     .def("info", (void(*)(const char*, pymargo_instance_id))pymargo_info, "message"_a, "mid"_a)
+     .def("warning", (void(*)(const char*))pymargo_warning, "message"_a)
+     .def("warning", (void(*)(const char*, pymargo_instance_id))pymargo_warning, "message"_a, "mid"_a)
+     .def("error", (void(*)(const char*))pymargo_error, "message"_a)
+     .def("error", (void(*)(const char*, pymargo_instance_id))pymargo_error, "message"_a, "mid"_a)
+     .def("critical", (void(*)(const char*))pymargo_critical, "message"_a)
+     .def("critical", (void(*)(const char*, pymargo_instance_id))pymargo_critical, "message"_a, "mid"_a)
      ;
 
     py11::enum_<pymargo_mode>(m,"mode")

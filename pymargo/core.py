@@ -3,6 +3,8 @@
 import _pymargo
 import json
 from .bulk import Bulk
+from .logging import Logger
+
 
 """
 Tags to indicate whether an Engine runs as a server
@@ -17,7 +19,7 @@ in the C++ side of the library.
 """
 Handle = _pymargo.Handle
 
-class Address():
+class Address:
     """
     Address class, represents the network address of an Engine.
     """
@@ -79,9 +81,42 @@ Since the Handle class is fully defined in C++, the get_addr function is added t
 """
 setattr(_pymargo.Handle, "get_addr", __Handler_get_Address)
 
-class Engine():
+
+class Engine:
+
+    class EngineLogger(Logger):
+
+        def __init__(self, engine):
+            self._engine = engine
+
+        def trace(self, msg):
+            _pymargo.trace(msg, mid=self._engine.mid)
+
+        def debug(self, msg):
+            _pymargo.debug(msg, mid=self._engine.mid)
+
+        def info(self, msg):
+            _pymargo.info(msg, mid=self._engine.mid)
+
+        def warning(self, msg):
+            _pymargo.warning(msg, mid=self._engine.mid)
+
+        def error(self, msg):
+            _pymargo.error(msg, mid=self._engine.mid)
+
+        def critical(self, msg):
+            _pymargo.critical(msg, mid=self._engine.mid)
+
+        def set_logger(self, logger):
+            _pymargo.set_logger(self._engine, logger)
+
+        def set_log_level(self, log_level):
+            _pymargo.set_log_level(self._engine._mid, log_level)
+
 
     def __init__(self, addr,
+
+
             mode=server,
             use_progress_thread=False,
             num_rpc_threads=0,
@@ -101,6 +136,7 @@ class Engine():
             opt = options
         self._mid = _pymargo.init(addr, mode, use_progress_thread, num_rpc_threads, opt)
         self._finalized = False
+        self._logger = Engine.EngineLogger(self)
 
     def __del__(self):
         """
@@ -202,6 +238,13 @@ class Engine():
         hg_addr = _pymargo.addr_self(self._mid)
         return Address(self._mid, hg_addr)
 
+    @property
+    def address(self):
+        """
+        Returns the Engine's address (Address instance).
+        """
+        return self.addr()
+
     def create_handle(self, addr, rpc_id):
         """
         Creates an RPC Handle to be sent to a given address.
@@ -241,7 +284,23 @@ class Engine():
         """
         return self._mid
 
-class Provider(object):
+    @property
+    def mid(self):
+        """
+        Returns the internal margo_instance_id.
+        """
+        return self._mid
+
+    @property
+    def logger(self):
+        """
+        Returns a Logger instance that will redirect messages to the
+        internal Margo instance.
+        """
+        return self._logger
+
+
+class Provider:
     """
     The Provider class represents an object for which some methods can be called remotely.
     """
@@ -275,7 +334,21 @@ class Provider(object):
         """
         return self._provider_id
 
+    @property
+    def provider_id(self):
+        """
+        Returns this provider's id.
+        """
+        return self._provider_id
+
     def get_engine(self):
+        """
+        Gets the Engine associated with this Provider.
+        """
+        return self._engine
+
+    @property
+    def engine(self):
         """
         Gets the Engine associated with this Provider.
         """

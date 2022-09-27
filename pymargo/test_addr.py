@@ -1,6 +1,6 @@
-import sys
 import unittest
 from pymargo.core import Engine, Address
+
 
 class TestAddr(unittest.TestCase):
 
@@ -23,6 +23,7 @@ class TestAddr(unittest.TestCase):
         addr_str = str(addr)
         self.assertIsInstance(addr_str, str)
         self.assertTrue('na+sm' in addr_str)
+
 
 if __name__ == '__main__':
     unittest.main()

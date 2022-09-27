@@ -3,7 +3,7 @@ import _pymargo
 """
 Tags to indicate what type of operations are expected from a Bulk handle.
 """
-read_only  = _pymargo.access.read_only
+read_only = _pymargo.access.read_only
 write_only = _pymargo.access.write_only
 read_write = _pymargo.access.read_write
 
@@ -12,6 +12,7 @@ Types of operations to perform on Bulk handles.
 """
 push = _pymargo.xfer.push
 pull = _pymargo.xfer.pull
+
 
 class Bulk:
     """

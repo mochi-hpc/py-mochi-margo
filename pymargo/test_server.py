@@ -1,6 +1,6 @@
-import sys
 import unittest
 from pymargo.core import Engine
+
 
 class TestInitEngine(unittest.TestCase):
 
@@ -11,7 +11,7 @@ class TestInitEngine(unittest.TestCase):
 
     def test_init_engine_fail(self):
         with self.assertRaises(RuntimeError):
-            engine = Engine('abc')
+            Engine('abc')
 
     class FinalizeCallback():
 
@@ -29,6 +29,7 @@ class TestInitEngine(unittest.TestCase):
         self.assertFalse(finalize_callback.finalize_was_called)
         engine.finalize()
         self.assertTrue(finalize_callback.finalize_was_called)
+
 
 if __name__ == '__main__':
     unittest.main()

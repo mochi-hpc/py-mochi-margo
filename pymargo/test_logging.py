@@ -1,8 +1,8 @@
-import sys
 import unittest
 from pymargo.core import Engine
 from pymargo.logging import Logger
 import pymargo.logging
+
 
 class MyLogger(Logger):
 

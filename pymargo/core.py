@@ -24,6 +24,7 @@ Exception raised by most of the pymargo C++ functions.
 """
 MargoException = _pymargo.MargoException
 
+
 class Address:
     """
     Address class, represents the network address of an Engine.
@@ -35,15 +36,15 @@ class Address:
         directly by users. Users need to call the Engine.lookup
         method to lookup a remote Engine.
         """
-        self._mid      = mid
-        self._hg_addr  = hg_addr
+        self._mid = mid
+        self._hg_addr = hg_addr
         self._need_del = need_del
 
     def __del__(self):
         """
         Destructor. This method will free the underlying hg_addr_t object.
         """
-        if(self._need_del):
+        if self._need_del:
             _pymargo.addr_free(self._mid, self._hg_addr)
 
     def __str__(self):
@@ -73,16 +74,19 @@ class Address:
         """
         return self._hg_addr
 
+
 def __Handler_get_Address(h):
     """
     This function gets the address of a the sender of a Handle.
     """
-    mid =  h._get_mid()
+    mid = h._get_mid()
     addr = h._get_hg_addr()
     return Address(mid, addr, need_del=False).copy()
 
+
 """
-Since the Handle class is fully defined in C++, the get_addr function is added this way.
+Since the Handle class is fully defined in C++, the get_addr
+function is added this way to return an Address object.
 """
 setattr(_pymargo.Handle, "get_addr", __Handler_get_Address)
 
@@ -118,14 +122,11 @@ class Engine:
         def set_log_level(self, log_level):
             _pymargo.set_log_level(self._engine._mid, log_level)
 
-
     def __init__(self, addr,
-
-
-            mode=server,
-            use_progress_thread=False,
-            num_rpc_threads=0,
-            options=""):
+                 mode=server,
+                 use_progress_thread=False,
+                 num_rpc_threads=0,
+                 options=""):
         """
         Constructor of the Engine class.
         addr : address of the Engine
@@ -139,7 +140,8 @@ class Engine:
             opt = json.dumps(options)
         else:
             opt = options
-        self._mid = _pymargo.init(addr, mode, use_progress_thread, num_rpc_threads, opt)
+        self._mid = _pymargo.init(
+            addr, mode, use_progress_thread, num_rpc_threads, opt)
         self._finalized = False
         self._logger = Engine.EngineLogger(self)
 
@@ -171,7 +173,7 @@ class Engine:
         """
         Finalizes the Engine.
         """
-        _pymargo.finalize(self._mid);
+        _pymargo.finalize(self._mid)
         self._finalized = True
 
     def wait_for_finalize(self):
@@ -183,16 +185,16 @@ class Engine:
 
     def on_prefinalize(self, callable_obj):
         """
-        Registers a callback (i.e. a function or an object with a __call__ method)
-        to be called before the Engine is finalized and before the Mercury progress
-        loop is terminated.
+        Registers a callback (i.e. a function or an object with a
+        __call__ method) to be called before the Engine is finalized
+        and before the Mercury progress loop is terminated.
         """
         _pymargo.push_prefinalize_callback(self._mid, callable_obj)
 
     def on_finalize(self, callable_obj):
         """
-        Registers a callback (i.e. a function or an object with a __call__ method)
-        to be called before this Engine is finalized.
+        Registers a callback (i.e. a function or an object with
+        a __call__ method) to be called before this Engine is finalized.
         """
         _pymargo.push_finalize_callback(self._mid, callable_obj)
 
@@ -204,34 +206,40 @@ class Engine:
 
     def register(self, rpc_name, obj=None, method_name=None, provider_id=0):
         """
-        Registers an RPC handle. If the Engine is a client, the obj, method_name
-        and provider_id arguments should be ommited. If the Engine is a server,
-        obj should be the object instance from which to call the method represented
-        by the method_name string, and provider_id should be the provider id at
-        which this object is reachable. The object should inherite from the Provider class.
-        rpc_name is the name of the RPC, to be used by clients when sending requests.
+        Registers an RPC handle. If the Engine is a client, the obj,
+        method_name and provider_id arguments should be ommited. If the
+        Engine is a server, obj should be the object instance from which to
+        call the method represented by the method_name string, and provider_id
+        should be the provider id at which this object is reachable.
+        The object should inherite from the Provider class. rpc_name is the
+        name of the RPC, to be used by clients when sending requests.
         """
         if (obj is None) and (method_name is None):
-            return _pymargo.register_on_client(self._mid, rpc_name, provider_id)
+            return _pymargo.register_on_client(
+                self._mid, rpc_name, provider_id)
         elif (obj is not None) and (method_name is not None):
-            return _pymargo.register(self._mid, rpc_name, provider_id, obj, method_name)
+            return _pymargo.register(
+                self._mid, rpc_name, provider_id, obj, method_name)
         else:
-            raise RuntimeError('MargoInstance.register: both method name and object instance should be provided')
+            raise RuntimeError(
+                'Both method name and object instance should be provided')
 
     def registered(self, rpc_name, provider_id=None):
         """
-        Checks if an RPC with the given name is registered. Returns the corresponding
-        RPC id if found, None otherwise. If provider_id is given, the returned RPC id will
-        integrate it.
+        Checks if an RPC with the given name is registered.
+        Returns the corresponding RPC id if found, None otherwise.
+        If provider_id is given, the returned RPC id will integrate it.
         """
         if provider_id is None:
-            return _pymargo.registered(self._mid, rpc_name) 
+            return _pymargo.registered(self._mid, rpc_name)
         else:
-            return _pymargo.registered_provider(self._mid, rpc_name, provider_id)
+            return _pymargo.registered_provider(
+                self._mid, rpc_name, provider_id)
 
     def lookup(self, straddr):
         """
-        Looks up a remote Engine's address from a string and return an Address instance.
+        Looks up a remote Engine's address from a string and
+        return an Address instance.
         """
         hg_addr = _pymargo.lookup(self._mid, straddr)
         return Address(self._mid, hg_addr)
@@ -269,7 +277,8 @@ class Engine:
         blk = _pymargo.bulk_create(self._mid, array, mode)
         return Bulk(self, blk)
 
-    def transfer(self, op, origin_addr, origin_handle, origin_offset, local_handle, local_offset, size):
+    def transfer(self, op, origin_addr, origin_handle, origin_offset,
+                 local_handle, local_offset, size):
         """
         Transfers data between Bulk handles.
         op : bulk.push or bulk.pull
@@ -280,8 +289,9 @@ class Engine:
         local_offset : offset in local memory
         size : size of data to transfer
         """
-        _pymargo.bulk_transfer(self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
-                origin_offset, local_handle._hg_bulk, local_offset, size)
+        _pymargo.bulk_transfer(
+            self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
+            origin_offset, local_handle._hg_bulk, local_offset, size)
 
     def get_internal_mid(self):
         """
@@ -307,7 +317,8 @@ class Engine:
 
 class Provider:
     """
-    The Provider class represents an object for which some methods can be called remotely.
+    The Provider class represents an object for which some methods
+    can be called remotely.
     """
 
     def __init__(self, engine, provider_id):
@@ -323,13 +334,16 @@ class Provider:
         """
         Registers one of this object's methods to be used as an RPC handler.
         rpc_name : string to use by clients to identify this RPC
-        method_name : string representation of the method to call in this object.
+        method_name : string representation of the method to call
+                      in this object.
         """
-        return self._engine.register(rpc_name, self, method_name, self._provider_id)
+        return self._engine.register(
+            rpc_name, self, method_name, self._provider_id)
 
     def registered(self, rpc_name):
         """
-        Checks if an RPC with the provided name has been registered for this provider.
+        Checks if an RPC with the provided name has been
+        registered for this provider.
         """
         return self._engine.registered(rpc_name, self._provider_id)
 

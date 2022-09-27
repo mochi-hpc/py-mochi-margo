@@ -5,7 +5,7 @@ from . import core
 client = core.client
 server = core.server
 
-MargoAddress  = core.Address
-MargoHandle   = core.Handle
+MargoAddress = core.Address
+MargoHandle = core.Handle
 MargoInstance = core.Engine
-Provider      = core.Provider
+Provider = core.Provider

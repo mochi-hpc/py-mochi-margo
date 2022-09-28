@@ -24,6 +24,12 @@ class TestAddr(unittest.TestCase):
         self.assertIsInstance(addr_str, str)
         self.assertTrue('na+sm' in addr_str)
 
+    def test_addr_eql(self):
+        addr = TestAddr.engine.addr()
+        addr_str = str(addr)
+        addr2 = TestAddr.engine.lookup(addr_str)
+        self.assertEqual(addr, addr2)
+
 
 if __name__ == '__main__':
     unittest.main()

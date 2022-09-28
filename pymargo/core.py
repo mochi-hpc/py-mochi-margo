@@ -55,6 +55,12 @@ class Address:
         """
         return _pymargo.addr2str(self._mid, self._hg_addr)
 
+    def __eq__(self, other: 'Address'):
+        """
+        Checks for equality between two addresses.
+        """
+        return _pymargo.addr_cmp(self._mid, self._hg_addr, other._hg_addr)
+
     def copy(self):
         """
         Copies this Address object.
@@ -72,6 +78,10 @@ class Address:
         """
         Get the internal hg_addr handle.
         """
+        return self._hg_addr
+
+    @property
+    def hg_addr(self):
         return self._hg_addr
 
 
@@ -183,6 +193,13 @@ class Engine:
         _pymargo.wait_for_finalize(self._mid)
         self._finalized = True
 
+    @property
+    def listening(self):
+        """
+        Returns whether the engine is listening for RPCs.
+        """
+        return _pymargo.is_listening(self._mid)
+
     def on_prefinalize(self, callable_obj):
         """
         Registers a callback (i.e. a function or an object with a
@@ -235,6 +252,24 @@ class Engine:
         else:
             return _pymargo.registered_provider(
                 self._mid, rpc_name, provider_id)
+
+    def deregister(self, rpc_id):
+        """
+        Deregisters an RPC.
+        """
+        _pymargo.deregister(self._mid, rpc_id)
+
+    def disable_response(self, rpc_id, disable: bool = True):
+        """
+        Disable response for the specified RPC.
+        """
+        _pymargo.disable_response(self._mid, rpc_id, disable)
+
+    def disabled_response(self, rpc_id):
+        """
+        Check if response is disabled for this RPC.
+        """
+        return _pymargo.disabled_response(self._mid, rpc_id)
 
     def lookup(self, straddr):
         """
@@ -313,6 +348,12 @@ class Engine:
         internal Margo instance.
         """
         return self._logger
+
+    def set_remove(self, address: Address):
+        """
+        Hint that the address is no longer valid.
+        """
+        _pymargo.addr_set_remove(self._mid, address.hg_addr)
 
 
 class Provider:

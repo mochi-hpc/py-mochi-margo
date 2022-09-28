@@ -41,7 +41,7 @@ struct pymargo_hg_handle {
     ~pymargo_hg_handle();
     hg_id_t get_id() const;
     pymargo_addr _get_hg_addr() const;
-    py11::bytes forward(uint16_t provider_id, py11::bytes input);
+    py11::object forward(uint16_t provider_id, py11::bytes input);
     void respond(py11::bytes output);
     pymargo_instance_id _get_mid() const;
 };
@@ -198,8 +198,11 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         return HG_OTHER_ERROR;
     }
 
-    std::string out;
-    {
+    int disabled_flag;
+    margo_registered_disabled_response(mid, info->id, &disabled_flag);
+
+    if(!disabled_flag) {
+        std::string out;
         py11::gil_scoped_acquire acquire;
         try {
             pymargo_hg_handle pyhandle(handle);
@@ -211,7 +214,7 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
             result = HG_OTHER_ERROR;
         } catch(const std::exception& ex) {
             std::cerr << ex.what();
-            std::abort();
+            std::exit(-1);
         }
     }
 
@@ -267,6 +270,42 @@ static hg_id_t pymargo_register_on_client(
         throw pymargo_exception("margo_register_provider", (hg_return_t)0);
     }
     return rpc_id;
+}
+
+static void pymargo_deregister(
+        pymargo_instance_id mid,
+        hg_id_t id)
+{
+    hg_return_t ret;
+    ret = margo_deregister(mid, id);
+
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_deregister", ret);
+    }
+}
+
+static void pymargo_disable_response(
+        pymargo_instance_id mid,
+        hg_id_t id, bool disable_flag)
+{
+    hg_return_t ret;
+    ret =  margo_registered_disable_response(mid, id, disable_flag);
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_deregistered_disable_response", ret);
+    }
+}
+
+static bool pymargo_disabled_response(
+        pymargo_instance_id mid,
+        hg_id_t id)
+{
+    hg_return_t ret;
+    int disable_flag;
+    ret =  margo_registered_disabled_response(mid, id, &disable_flag);
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_deregistered_disabled_response", ret);
+    }
+    return static_cast<bool>(disable_flag);
 }
 
 static py11::object pymargo_registered(
@@ -365,6 +404,24 @@ static pymargo_addr pymargo_addr_dup(
     return ADDR2CAPSULE(newaddr);
 }
 
+static bool pymargo_addr_cmp(
+        pymargo_instance_id mid,
+        pymargo_addr addr1,
+        pymargo_addr addr2)
+{
+    return margo_addr_cmp(mid, addr1, addr2);
+}
+
+static void pymargo_addr_set_remove(
+        pymargo_instance_id mid,
+        pymargo_addr addr)
+{
+    hg_return_t ret = margo_addr_set_remove(mid, addr);
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_addr_set_remove", ret);
+    }
+}
+
 static std::string pymargo_addr_to_string(
         pymargo_instance_id mid,
         pymargo_addr addr)
@@ -412,38 +469,38 @@ pymargo_hg_handle::~pymargo_hg_handle()
     margo_destroy(handle);
 }
 
-py11::bytes pymargo_hg_handle::forward(uint16_t provider_id, py11::bytes input)
+py11::object pymargo_hg_handle::forward(uint16_t provider_id, py11::bytes input)
 {
+    int disabled_flag;
     hg_return_t ret;
+
     Py_BEGIN_ALLOW_THREADS
     ret = margo_provider_forward(provider_id, handle, &input);
     Py_END_ALLOW_THREADS
-
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_provider_forward", ret);
     }
+    auto mid = margo_hg_handle_get_instance(handle);
+    auto info = margo_get_info(handle);
 
-    py11::bytes out;
-    ret = margo_get_output(handle, &out);
-    if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_get_output", ret);
+    margo_registered_disabled_response(mid, info->id, &disabled_flag);
+
+    if(!disabled_flag) {
+        py11::bytes out;
+        ret = margo_get_output(handle, &out);
+        if(ret != HG_SUCCESS) {
+            throw pymargo_exception("margo_get_output", ret);
+        }
+        ret = margo_free_output(handle, &out);
+        if(ret != HG_SUCCESS) {
+            throw pymargo_exception("margo_free_output", ret);
+        }
+        return out;
+    } else {
+        return py11::none();
     }
-    ret = margo_free_output(handle, &out);
-    if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_free_output", ret);
-    }
-    return out;
 }
-/*
-static void pymargo_forward_timed(
-        pymargo_hg_handle pyhandle,
-        const std::string& input,
-        double timeout_ms)
-{
-    margo_forward_timed(pyhandle.handle, const_cast<char*>(input.data()), timeout_ms);
-    // TODO throw an exception if the return value is not  HG_SUCCESS
-}
-*/
+
 void pymargo_hg_handle::respond(py11::bytes output)
 {
     hg_return_t ret;
@@ -856,15 +913,18 @@ PYBIND11_MODULE(_pymargo, m)
 
     m.def("init",                     &pymargo_init);
     m.def("finalize", [](pymargo_instance_id mid) {
-            margo_finalize(mid);
+        margo_finalize(mid);
     });
     m.def("wait_for_finalize",  [](pymargo_instance_id mid) {
-            py11::gil_scoped_release release;
-            margo_wait_for_finalize(mid);
+        py11::gil_scoped_release release;
+        margo_wait_for_finalize(mid);
+    });
+    m.def("is_listening", [](pymargo_instance_id mid) {
+        return static_cast<bool>(margo_is_listening(mid));
     });
 
-    m.def("push_finalize_callback",   &pymargo_push_finalize_callback);
-    m.def("push_prefinalize_callback",   &pymargo_push_prefinalize_callback);
+    m.def("push_finalize_callback", &pymargo_push_finalize_callback);
+    m.def("push_prefinalize_callback", &pymargo_push_prefinalize_callback);
     m.def("enable_remote_shutdown", [](pymargo_instance_id mid) {
             margo_enable_remote_shutdown(mid);
     });
@@ -876,10 +936,15 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("register_on_client",       &pymargo_register_on_client);
     m.def("registered",               &pymargo_registered);
     m.def("registered_provider",      &pymargo_provider_registered);
+    m.def("deregister",               &pymargo_deregister);
+    m.def("disable_response",         &pymargo_disable_response);
+    m.def("disabled_response",        &pymargo_disabled_response);
     m.def("lookup",                   &pymargo_lookup);
     m.def("addr_free",                &pymargo_addr_free);
     m.def("addr_self",                &pymargo_addr_self);
     m.def("addr_dup",                 &pymargo_addr_dup);
+    m.def("addr_cmp",                 &pymargo_addr_cmp);
+    m.def("addr_set_remove",          &pymargo_addr_set_remove);
     m.def("addr2str",                 &pymargo_addr_to_string);
     m.def("create",                   &pymargo_create);
 
@@ -894,7 +959,7 @@ PYBIND11_MODULE(_pymargo, m)
 
     // Inside abt package
     py11::module abt_package = m.def_submodule("abt");
-    abt_package.def("yield", &py_abt_yield);
+    abt_package.def("_yield", &py_abt_yield);
     py11::class_<py_abt_mutex>(abt_package,"Mutex")
         .def(py11::init<bool>())
         .def("lock", &py_abt_mutex::lock)

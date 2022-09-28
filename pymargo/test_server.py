@@ -7,6 +7,7 @@ class TestInitEngine(unittest.TestCase):
     def test_init_engine(self):
         engine = Engine('na+sm')
         self.assertIsInstance(engine, Engine)
+        self.assertTrue(engine.listening)
         engine.finalize()
 
     def test_init_engine_fail(self):

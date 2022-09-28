@@ -15,7 +15,8 @@ class TestRPC(unittest.TestCase):
         cls.receiver = Receiver()
         cls.engine = Engine('na+sm')
         cls.hello_world = cls.engine.register(
-            'hello_world', cls.receiver.hello_world)
+            'hello_world',
+            cls.receiver.hello_world)
 
     @classmethod
     def tearDownClass(cls):

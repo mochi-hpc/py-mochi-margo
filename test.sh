@@ -5,4 +5,4 @@ BUILD=( $HERE/build/lib.* )
 export PYTHONPATH=${BUILD[0]}:$PYTHONPATH
 export HG_LOG_LEVEL=""
 
-python3 -m unittest
+python3 -m unittest --verbose $1

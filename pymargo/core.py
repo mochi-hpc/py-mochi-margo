@@ -1,6 +1,7 @@
 # (C) 2018 The University of Chicago
 # See COPYRIGHT in top-level directory.
 import _pymargo
+import types
 import json
 import pickle
 from .bulk import Bulk
@@ -324,7 +325,8 @@ class Engine:
         """
         _pymargo.enable_remote_shutdown(self._mid)
 
-    def register(self, rpc_name, function=None, provider_id=0):
+    def register(self, rpc_name=None, func=None, provider_id=0,
+                 disable_response=False):
         """
         Registers an RPC handle. If the Engine is a client, the function
         and provider_id arguments should be ommited. If the engine is a
@@ -332,18 +334,44 @@ class Engine:
         bound to an object. rpc_name is the name of the RPC, to be used
         by clients when sending requests.
         """
-        if function is None:
+        if func is None:
+            if rpc_name is None:
+                raise ValueError(
+                    'Client-side RPC registration needs rpc_name argument')
             rpc_id = _pymargo.register_on_client(
                 self._mid, rpc_name, provider_id)
+
         else:
+            if rpc_name is None:
+                if hasattr(func, '_pymargo_info'):
+                    rpc_name = func._pymargo_info['rpc_name']
+                    disable_response = func._pymargo_info['disable_response']
+                elif isinstance(func, types.MethodType):
+                    rpc_name = func.__func__.__qualname__
+                elif isinstance(func, types.FunctionType):
+                    rpc_name = func.__qualname__
+
             def wrapper(handle, raw_input_data):
                 input_data = pickle.loads(raw_input_data)
                 args = input_data['args']
                 kwargs = input_data['kwargs']
-                function(handle, *args, **kwargs)
+                func(handle, *args, **kwargs)
             rpc_id = _pymargo.register(
                 self._mid, rpc_name, provider_id, wrapper)
-        return RemoteFunction(self, rpc_id)
+        remote_function = RemoteFunction(self, rpc_id)
+        remote_function.disable_response(disable_response)
+        return remote_function
+
+    def register_provider(self, provider, provider_id=0):
+        """
+        Discovers all the function decorated with @remote in the
+        provider and registers them in this engine with the specified
+        provider id.
+        """
+        funcs = [getattr(provider, f) for f in dir(provider)]
+        funcs = [f for f in funcs if hasattr(f, '_pymargo_info')]
+        return {func._pymargo_info['rpc_name']: self.register(func=func)
+                for func in funcs}
 
     def registered(self, rpc_name, provider_id=None):
         """
@@ -439,60 +467,21 @@ class Engine:
         _pymargo.addr_set_remove(self._mid, address.hg_addr)
 
 
-class Provider:
+def remote(rpc_name=None, disable_response=False):
     """
-    The Provider class represents an object for which some methods
-    can be called remotely.
+    Decorator that adds information to a function to tell
+    pymargo how it should be registeted as an RPC.
     """
-
-    def __init__(self, engine, provider_id):
-        """
-        Constructor.
-        engine : instance of Engine attached to this Provider
-        provider_id : id at which this provider is reachable
-        """
-        self._engine = engine
-        self._provider_id = provider_id
-
-    def register(self, rpc_name, method):
-        """
-        Registers one of this object's methods to be used as an RPC handler.
-        rpc_name : string to use by clients to identify this RPC
-        method_name : string representation of the method to call
-                      in this object.
-        """
-        return self._engine.register(
-            rpc_name, method, provider_id=self._provider_id)
-
-    def registered(self, rpc_name):
-        """
-        Checks if an RPC with the provided name has been
-        registered for this provider.
-        """
-        return self._engine.registered(rpc_name, self._provider_id)
-
-    def get_provider_id(self):
-        """
-        Returns this provider's id.
-        """
-        return self._provider_id
-
-    @property
-    def provider_id(self):
-        """
-        Returns this provider's id.
-        """
-        return self._provider_id
-
-    def get_engine(self):
-        """
-        Gets the Engine associated with this Provider.
-        """
-        return self._engine
-
-    @property
-    def engine(self):
-        """
-        Gets the Engine associated with this Provider.
-        """
-        return self._engine
+    def decorator(func):
+        name = rpc_name
+        if name is None:
+            if isinstance(func, types.MethodType):
+                name = func.__func__.__qualname__
+            elif isinstance(func, types.FunctionType):
+                name = func.__qualname__
+        func._pymargo_info = {
+            'rpc_name': name,
+            'disable_response': disable_response
+        }
+        return func
+    return decorator

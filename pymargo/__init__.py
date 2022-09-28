@@ -8,4 +8,5 @@ server = core.server
 MargoAddress = core.Address
 MargoHandle = core.Handle
 MargoInstance = core.Engine
-Provider = core.Provider
+
+remote = core.remote

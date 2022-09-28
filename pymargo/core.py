@@ -2,6 +2,7 @@
 # See COPYRIGHT in top-level directory.
 import _pymargo
 import json
+import pickle
 from .bulk import Bulk
 from .logging import Logger
 
@@ -85,7 +86,7 @@ class Address:
         return self._hg_addr
 
 
-def __Handler_get_Address(h):
+def __Handle_get_Address(h):
     """
     This function gets the address of a the sender of a Handle.
     """
@@ -94,11 +95,113 @@ def __Handler_get_Address(h):
     return Address(mid, addr, need_del=False).copy()
 
 
+def __Handle_respond(h, data):
+    """
+    This function calls h._respond with pickled data.
+    """
+    h._respond(pickle.dumps(data))
+
+
 """
 Since the Handle class is fully defined in C++, the get_addr
-function is added this way to return an Address object.
+and respond functions must added this way to return an Address object
+and use the pickle module, respectively
 """
-setattr(_pymargo.Handle, "get_addr", __Handler_get_Address)
+setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
+setattr(_pymargo.Handle, "respond", __Handle_respond)
+
+
+class CallableRemoteFunction:
+
+    def __init__(self, remote_function: 'RemoteFunction',
+                 handle: Handle, provider_id: int):
+        self._remote_function = remote_function
+        self._handle = handle
+        self._provider_id = provider_id
+
+    @property
+    def handle(self):
+        return self._handle
+
+    @property
+    def remote_function(self):
+        return self._remote_function
+
+    @property
+    def engine(self):
+        return self.remote_function.engine
+
+    @property
+    def provider_id(self):
+        return self._provider_id
+
+    @property
+    def encoder(self):
+        return self._encoder
+
+    @encoder.setter
+    def encoder(self, new_encoder):
+        self._encoder = new_encoder
+
+    @property
+    def decoder(self):
+        return self._decoder
+
+    @decoder.setter
+    def decoder(self, new_decoder):
+        self._decoder = new_decoder
+
+    def __call__(self, *args, **kwargs):
+        data = {
+            'args': args,
+            'kwargs': kwargs
+        }
+        raw_data = pickle.dumps(data)
+        raw_response = self.handle._forward(self.provider_id, raw_data)
+        if raw_response is None:
+            return None
+        return pickle.loads(raw_response)
+
+
+class RemoteFunction:
+
+    def __init__(self, engine, rpc_id):
+        self._engine = engine
+        self._rpc_id = rpc_id
+
+    @property
+    def rpc_id(self):
+        return self._rpc_id
+
+    @property
+    def engine(self):
+        return self._engine
+
+    def on(self, address: Address, provider_id: int = 0):
+        """
+        Binds the RemoteFunction to an Address and provider_id,
+        returning a CallableRemoteFunction that can be called.
+        """
+        handle = _pymargo.create(self.engine.mid, address.hg_addr, self.rpc_id)
+        return CallableRemoteFunction(self, handle, provider_id)
+
+    def disable_response(self, disable=True):
+        """
+        Disable or enable response for the RemoteFunction.
+        """
+        _pymargo.disable_response(self.engine.mid, self.rpc_id, disable)
+
+    def disabled_response(self):
+        """
+        Returns whether response is disabled for this RemoteFunction.
+        """
+        return _pymargo.disabled_response(self.engine.mid, self.rpc_id)
+
+    def deregister(self):
+        """
+        Deregisters the function from the engine.
+        """
+        _pymargo.deregister(self.engine.mid, self.rpc_id)
 
 
 class Engine:
@@ -221,25 +324,26 @@ class Engine:
         """
         _pymargo.enable_remote_shutdown(self._mid)
 
-    def register(self, rpc_name, obj=None, method_name=None, provider_id=0):
+    def register(self, rpc_name, function=None, provider_id=0):
         """
-        Registers an RPC handle. If the Engine is a client, the obj,
-        method_name and provider_id arguments should be ommited. If the
-        Engine is a server, obj should be the object instance from which to
-        call the method represented by the method_name string, and provider_id
-        should be the provider id at which this object is reachable.
-        The object should inherite from the Provider class. rpc_name is the
-        name of the RPC, to be used by clients when sending requests.
+        Registers an RPC handle. If the Engine is a client, the function
+        and provider_id arguments should be ommited. If the engine is a
+        server, function should be a callable object (function or method
+        bound to an object. rpc_name is the name of the RPC, to be used
+        by clients when sending requests.
         """
-        if (obj is None) and (method_name is None):
-            return _pymargo.register_on_client(
+        if function is None:
+            rpc_id = _pymargo.register_on_client(
                 self._mid, rpc_name, provider_id)
-        elif (obj is not None) and (method_name is not None):
-            return _pymargo.register(
-                self._mid, rpc_name, provider_id, obj, method_name)
         else:
-            raise RuntimeError(
-                'Both method name and object instance should be provided')
+            def wrapper(handle, raw_input_data):
+                input_data = pickle.loads(raw_input_data)
+                args = input_data['args']
+                kwargs = input_data['kwargs']
+                function(handle, *args, **kwargs)
+            rpc_id = _pymargo.register(
+                self._mid, rpc_name, provider_id, wrapper)
+        return RemoteFunction(self, rpc_id)
 
     def registered(self, rpc_name, provider_id=None):
         """
@@ -248,28 +352,14 @@ class Engine:
         If provider_id is given, the returned RPC id will integrate it.
         """
         if provider_id is None:
-            return _pymargo.registered(self._mid, rpc_name)
+            rpc_id = _pymargo.registered(self._mid, rpc_name)
         else:
-            return _pymargo.registered_provider(
+            rpc_id = _pymargo.registered_provider(
                 self._mid, rpc_name, provider_id)
-
-    def deregister(self, rpc_id):
-        """
-        Deregisters an RPC.
-        """
-        _pymargo.deregister(self._mid, rpc_id)
-
-    def disable_response(self, rpc_id, disable: bool = True):
-        """
-        Disable response for the specified RPC.
-        """
-        _pymargo.disable_response(self._mid, rpc_id, disable)
-
-    def disabled_response(self, rpc_id):
-        """
-        Check if response is disabled for this RPC.
-        """
-        return _pymargo.disabled_response(self._mid, rpc_id)
+        if rpc_id is None:
+            return None
+        else:
+            return RemoteFunction(self, rpc_id)
 
     def lookup(self, straddr):
         """
@@ -292,13 +382,6 @@ class Engine:
         Returns the Engine's address (Address instance).
         """
         return self.addr()
-
-    def create_handle(self, addr, rpc_id):
-        """
-        Creates an RPC Handle to be sent to a given address.
-        """
-        h = _pymargo.create(self._mid, addr._hg_addr, rpc_id)
-        return h
 
     def create_bulk(self, array, mode):
         """
@@ -371,7 +454,7 @@ class Provider:
         self._engine = engine
         self._provider_id = provider_id
 
-    def register(self, rpc_name, method_name):
+    def register(self, rpc_name, method):
         """
         Registers one of this object's methods to be used as an RPC handler.
         rpc_name : string to use by clients to identify this RPC
@@ -379,7 +462,7 @@ class Provider:
                       in this object.
         """
         return self._engine.register(
-            rpc_name, self, method_name, self._provider_id)
+            rpc_name, method, provider_id=self._provider_id)
 
     def registered(self, rpc_name):
         """

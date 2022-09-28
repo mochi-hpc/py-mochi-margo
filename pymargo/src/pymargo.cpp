@@ -29,8 +29,7 @@ typedef py11::capsule pymargo_bulk;
 #define CAPSULE2BULK(__caps) (hg_bulk_t)(__caps)
 
 struct __attribute__ ((visibility("hidden"))) pymargo_rpc_data {
-    py11::object obj;
-    std::string method;
+    py11::object callable;
 };
 
 struct pymargo_hg_handle {
@@ -207,8 +206,7 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         try {
             pymargo_hg_handle pyhandle(handle);
             margo_ref_incr(handle);
-            py11::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
-            py11::object r = fun(pyhandle, input);
+            py11::object r = rpc_data->callable(pyhandle, input);
         } catch(const py11::error_already_set& e) {
             std::cerr << "[Py-Margo] ERROR: " << e.what() << std::endl;
             result = HG_OTHER_ERROR;
@@ -232,8 +230,7 @@ static hg_id_t pymargo_register(
         pymargo_instance_id mid,
         const std::string& rpc_name,
         uint16_t provider_id,
-        py11::object obj,
-        const std::string& method_name)
+        py11::object callable)
 {
     hg_return_t ret;
 
@@ -243,8 +240,7 @@ static hg_id_t pymargo_register(
             provider_id, ABT_POOL_NULL);
 
     pymargo_rpc_data* rpc_data = new pymargo_rpc_data;
-    rpc_data->obj    = obj;
-    rpc_data->method = method_name;
+    rpc_data->callable = callable;
 
     ret = margo_register_data(mid, rpc_id,
                 static_cast<void*>(rpc_data), delete_rpc_data);
@@ -906,8 +902,8 @@ PYBIND11_MODULE(_pymargo, m)
     py11::class_<pymargo_hg_handle>(m,"Handle")
         .def("_get_hg_addr", &pymargo_hg_handle::_get_hg_addr)
         .def("get_id", &pymargo_hg_handle::get_id)
-        .def("forward", &pymargo_hg_handle::forward)
-        .def("respond", &pymargo_hg_handle::respond)
+        .def("_forward", &pymargo_hg_handle::forward)
+        .def("_respond", &pymargo_hg_handle::respond)
         .def("_get_mid", &pymargo_hg_handle::_get_mid)
         ;
 

@@ -1,4 +1,9 @@
 import _pymargo
+from typing import TYPE_CHECKING
+from .typing import hg_bulk_t
+
+if TYPE_CHECKING:
+    from .core import Engine
 
 """
 Tags to indicate what type of operations are expected from a Bulk handle.
@@ -20,7 +25,7 @@ class Bulk:
     enable serialization/deserialization to send them in RPCs.
     """
 
-    def __init__(self, engine, hg_bulk):
+    def __init__(self, engine: 'Engine', hg_bulk: hg_bulk_t):
         """
         Constructor. This method is not supposed to be called by users.
         Users must call Engine.create_bulk instead.
@@ -30,13 +35,13 @@ class Bulk:
         self._engine = engine
         self._hg_bulk = hg_bulk
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor. Frees the underlying hg_bulk_t handle.
         """
         _pymargo.bulk_free(self._hg_bulk)
 
-    def to_base64(self, eager=False):
+    def to_base64(self, eager: bool = False) -> str:
         """
         Converts the Bulk handle into a base64 string so it can be sent
         as argument to an RPC.
@@ -45,7 +50,7 @@ class Bulk:
         """
         return _pymargo.bulk_to_base64(self._hg_bulk, eager)
 
-    def to_bytes(self, eager=False):
+    def to_bytes(self, eager: bool = False):
         """
         Converts the Bulk handle into a bytes object.
         eager : if set to True, the data exposed by the Bulk handle will
@@ -54,7 +59,7 @@ class Bulk:
         return _pymargo.bulk_to_str(self._hg_bulk, eager)
 
     @staticmethod
-    def from_base64(engine, bulk_str):
+    def from_base64(engine, bulk_str: str) -> Bulk:
         """
         Static method that creates a Bulk from a base64 representation.
         engine : Engine to use for this Bulk handle.
@@ -64,7 +69,7 @@ class Bulk:
         return Bulk(engine, blk)
 
     @staticmethod
-    def from_bytes(engine, bulk_bytes):
+    def from_bytes(engine, bulk_bytes: bytes) -> Bulk:
         """
         Static method that creates a Bulk from a bytes representation.
         engine : Engine to use for this Bulk handle.

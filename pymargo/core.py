@@ -386,17 +386,30 @@ class Engine:
         remote_function.disable_response(disable_response)
         return remote_function
 
-    def register_provider(self, provider: Any, provider_id: int = 0) \
+    def register_provider(self, provider: Any, provider_id: int = 0,
+                          service_name: Optional[str] = None) \
             -> Mapping[str, RemoteFunction]:
         """
         Discovers all the function decorated with @remote in the
         provider and registers them in this engine with the specified
         provider id.
         """
+        provider_cls = type(provider)
+        if hasattr(provider_cls, '_pymargo_provider_info'):
+            if service_name is None:
+                service_name = \
+                    provider_cls._pymargo_provider_info['service_name']
         funcs = [getattr(provider, f) for f in dir(provider)]
         funcs = [f for f in funcs if hasattr(f, '_pymargo_info')]
-        return {func._pymargo_info['rpc_name']: self.register(func=func)
-                for func in funcs}
+        result = {}
+        for func in funcs:
+            if service_name is None:
+                service_name = func._pymargo_info['service_name']
+            rpc_name = func._pymargo_info['rpc_name']
+            if service_name is not None:
+                rpc_name = service_name + "_" + rpc_name
+            result[rpc_name] = self.register(func=func, rpc_name=rpc_name)
+        return result
 
     def registered(self, rpc_name: str,
                    provider_id: Optional[int] = None) \
@@ -496,21 +509,38 @@ class Engine:
 
 
 def remote(rpc_name: Optional[str] = None,
-           disable_response: Optional[bool] = False):
+           disable_response: Optional[bool] = False,
+           service_name: Optional[str] = None):
     """
     Decorator that adds information to a function to tell
     pymargo how it should be registeted as an RPC.
     """
     def decorator(func):
         name = rpc_name
+        sname = service_name
         if name is None:
             if isinstance(func, types.MethodType):
-                name = func.__func__.__qualname__
+                name = func.__func__.__name__
             elif isinstance(func, types.FunctionType):
-                name = func.__qualname__
+                name = func.__name__
         func._pymargo_info = {
             'rpc_name': name,
-            'disable_response': disable_response
+            'disable_response': disable_response,
+            'service_name': service_name
         }
         return func
+    return decorator
+
+
+def provider(service_name: Optional[str] = None):
+    """
+    Decorator that adds information to a class to tell
+    pymargo how it should be registered as a provider.
+    """
+    def decorator(cls):
+        _pymargo_info = {
+            'service_name': service_name
+        }
+        setattr(cls, '_pymargo_provider_info', _pymargo_info)
+        return cls
     return decorator

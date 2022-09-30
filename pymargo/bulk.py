@@ -59,7 +59,7 @@ class Bulk:
         return _pymargo.bulk_to_str(self._hg_bulk, eager)
 
     @staticmethod
-    def from_base64(engine, bulk_str: str) -> Bulk:
+    def from_base64(engine, bulk_str: str) -> 'Bulk':
         """
         Static method that creates a Bulk from a base64 representation.
         engine : Engine to use for this Bulk handle.
@@ -69,7 +69,7 @@ class Bulk:
         return Bulk(engine, blk)
 
     @staticmethod
-    def from_bytes(engine, bulk_bytes: bytes) -> Bulk:
+    def from_bytes(engine, bulk_bytes: bytes) -> 'Bulk':
         """
         Static method that creates a Bulk from a bytes representation.
         engine : Engine to use for this Bulk handle.

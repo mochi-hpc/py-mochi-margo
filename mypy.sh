@@ -7,11 +7,6 @@ export MYPYPATH=$HERE/stubs
 
 pybind11-stubgen --root-module-suffix "" _pymargo
 
-# fix missing capsule class
-printf "class capsule():\n    pass\n" \
-    | cat - $HERE/stubs/_pymargo/__init__.pyi > temp \
-    && mv temp $HERE/stubs/_pymargo/__init__.pyi
-
 # fix missing buffer class
 printf "from typing import Any\nbuffer = Any\n" \
     | cat - $HERE/stubs/_pymargo/__init__.pyi > temp \

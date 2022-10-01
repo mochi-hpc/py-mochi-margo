@@ -17,16 +17,19 @@ namespace np = py11;
 
 using namespace pybind11::literals;
 
-typedef py11::capsule pymargo_instance_id;
-typedef py11::capsule pymargo_addr;
-typedef py11::capsule pymargo_bulk;
+template<typename T>
+struct opaque_pointer {
+    T m_t;
+    opaque_pointer(T t = nullptr)
+    : m_t(t) {}
+    operator T() const {
+        return m_t;
+    }
+};
 
-#define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id", nullptr)
-#define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t", nullptr)
-#define BULK2CAPSULE(__blk)  py11::capsule((void*)(__blk), "hg_bulk_t", nullptr)
-#define CAPSULE2MID(__caps)  (margo_instance_id)(__caps)
-#define CAPSULE2ADDR(__caps) (hg_addr_t)(__caps)
-#define CAPSULE2BULK(__caps) (hg_bulk_t)(__caps)
+using pymargo_instance_id = opaque_pointer<margo_instance_id>;
+using pymargo_addr = opaque_pointer<hg_addr_t>;
+using pymargo_bulk = opaque_pointer<hg_bulk_t>;
 
 struct __attribute__ ((visibility("hidden"))) pymargo_rpc_data {
     py11::object callable;
@@ -135,7 +138,7 @@ static pymargo_instance_id pymargo_init(
     if(mid == MARGO_INSTANCE_NULL) {
         throw std::runtime_error("margo_init() returned MARGO_INSTANCE_NULL");
     }
-    return MID2CAPSULE(mid);
+    return mid;
 }
 
 static void pymargo_generic_finalize_cb(void* arg)
@@ -361,7 +364,7 @@ static pymargo_addr pymargo_lookup(
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_addr_lookup", ret);
     }
-    return ADDR2CAPSULE(addr);
+    return addr;
 }
 
 static void pymargo_addr_free(
@@ -384,7 +387,7 @@ static pymargo_addr pymargo_addr_self(
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_addr_self", ret);
     }
-    return ADDR2CAPSULE(addr);
+    return addr;
 }
 
 static pymargo_addr pymargo_addr_dup(
@@ -397,7 +400,7 @@ static pymargo_addr pymargo_addr_dup(
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_addr_dup", ret);
     }
-    return ADDR2CAPSULE(newaddr);
+    return newaddr;
 }
 
 static bool pymargo_addr_cmp(
@@ -517,12 +520,12 @@ hg_id_t pymargo_hg_handle::get_id() const
 pymargo_addr pymargo_hg_handle::_get_hg_addr() const
 {
     auto info = margo_get_info(handle);
-    return ADDR2CAPSULE(info->addr);
+    return info->addr;
 }
 
 pymargo_instance_id pymargo_hg_handle::_get_mid() const
 {
-    return MID2CAPSULE(margo_hg_handle_get_instance(handle));
+    return margo_hg_handle_get_instance(handle);
 }
 
 #define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
@@ -549,7 +552,7 @@ pymargo_bulk pymargo_bulk_create(
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_bulk_create", ret);
     }
-    return BULK2CAPSULE(handle);
+    return handle;
 }
 
 void pymargo_bulk_free(pymargo_bulk bulk) {
@@ -622,7 +625,7 @@ pymargo_bulk pymargo_base64_to_bulk(
         throw pymargo_exception("margo_bulk_deserialize", ret);
     }
 
-    return BULK2CAPSULE(handle);
+    return handle;
 }
 
 pymargo_bulk pymargo_str_to_bulk(
@@ -637,7 +640,7 @@ pymargo_bulk pymargo_str_to_bulk(
         throw pymargo_exception("margo_bulk_deserialize", ret);
     }
 
-    return BULK2CAPSULE(handle);
+    return handle;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -791,7 +794,7 @@ static int pymargo_set_logger(py11::object engine, py11::object logger) {
         LOG_FN(critical)
     };
 #undef LOG_FN
-    pymargo_instance_id mid = engine.attr("_mid");
+    pymargo_instance_id mid = engine.attr("_mid").cast<pymargo_instance_id>();
 
     return margo_set_logger(mid, &lgr);
 }
@@ -854,6 +857,10 @@ PYBIND11_MODULE(_pymargo, m)
 //    py11::class_<pymargo_exception>(m, "MargoException")
 //        .def_readonly("code", &pymargo_exception::code);
     py11::register_exception<pymargo_exception>(m, "MargoException");
+
+    py11::class_<pymargo_instance_id>(m, "margo_instance_id");
+    py11::class_<pymargo_addr>(m, "hg_addr_t");
+    py11::class_<pymargo_bulk>(m, "hg_bulk_t");
 
     py11::enum_<margo_log_level>(m, "log_level")
         .value("external", MARGO_LOG_EXTERNAL)

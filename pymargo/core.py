@@ -93,31 +93,6 @@ class Address:
         return self._hg_addr
 
 
-def __Handle_get_Address(h: _pymargo.Handle) -> Address:
-    """
-    This function gets the address of a the sender of a Handle.
-    """
-    mid = h._get_mid()
-    addr = h._get_hg_addr()
-    return Address(mid, addr, need_del=False).copy()
-
-
-def __Handle_respond(h: _pymargo.Handle, data: Any = None) -> None:
-    """
-    This function calls h._respond with pickled data.
-    """
-    h._respond(pickle.dumps(data))
-
-
-"""
-Since the Handle class is fully defined in C++, the get_addr
-and respond functions must added this way to return an Address object
-and use the pickle module, respectively
-"""
-setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
-setattr(_pymargo.Handle, "respond", __Handle_respond)
-
-
 class Request:
     """
     Generic Request wrapper for non-blocking operations.
@@ -221,6 +196,41 @@ class CallableRemoteFunction:
             return self._forward(*args, timeout=timeout, **kwargs)
         else:
             return self._iforward(*args, timeout=timeout, **kwargs)
+
+
+def __Handle_get_Address(h: _pymargo.Handle) -> Address:
+    """
+    This function gets the address of a the sender of a Handle.
+    """
+    mid = h._get_mid()
+    addr = h._get_hg_addr()
+    return Address(mid, addr, need_del=False).copy()
+
+
+def __Handle_respond(h: _pymargo.Handle, data: Any = None) -> None:
+    """
+    This function calls h._respond with pickled data.
+    """
+    h._respond(pickle.dumps(data))
+
+
+def __Handle_irespond(h: _pymargo.Handle, data: Any = None) -> Request:
+    """
+    This function calls h._irespond with picked data
+    and wraps the resuting margo_request into a Request object.
+    """
+    req = h._irespond(pickle.dumps(data))
+    return Request(req)
+
+
+"""
+Since the Handle class is fully defined in C++, the get_addr
+and respond functions must added this way to return an Address object
+and use the pickle module, respectively
+"""
+setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
+setattr(_pymargo.Handle, "respond", __Handle_respond)
+setattr(_pymargo.Handle, "irespond", __Handle_irespond)
 
 
 class RemoteFunction:

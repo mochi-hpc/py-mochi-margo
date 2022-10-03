@@ -47,6 +47,7 @@ struct pymargo_hg_handle {
     py11::object forward(uint16_t provider_id, py11::bytes input, double timeout);
     pymargo_request iforward(uint16_t provider_id, py11::bytes input, double timeout);
     void respond(py11::bytes output);
+    pymargo_request irespond(py11::bytes output);
     pymargo_instance_id _get_mid() const;
     py11::object _get_output() const;
 };
@@ -541,6 +542,19 @@ void pymargo_hg_handle::respond(py11::bytes output)
     }
 }
 
+pymargo_request pymargo_hg_handle::irespond(py11::bytes output)
+{
+    hg_return_t ret;
+    margo_request req;
+    Py_BEGIN_ALLOW_THREADS
+    ret = margo_irespond(handle, &output, &req);
+    Py_END_ALLOW_THREADS
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_respond", ret);
+    }
+    return req;
+}
+
 hg_id_t pymargo_hg_handle::get_id() const
 {
     auto info = margo_get_info(handle);
@@ -973,6 +987,7 @@ PYBIND11_MODULE(_pymargo, m)
              "provider_id"_a=0, "input"_a=py11::bytes(), "timeout"_a=0.0)
         .def("_get_output", &pymargo_hg_handle::_get_output)
         .def("_respond", &pymargo_hg_handle::respond)
+        .def("_irespond", &pymargo_hg_handle::irespond)
         .def("_get_mid", &pymargo_hg_handle::_get_mid)
         ;
 

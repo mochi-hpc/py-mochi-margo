@@ -11,6 +11,11 @@ class Receiver():
     def hello_world(self, handle, firstname, lastname):
         handle.respond(f'Hello {firstname} {lastname}')
 
+    def ihello_world(self, handle, firstname, lastname):
+        req = handle.irespond(f'Hello {firstname} {lastname}')
+        req.test()
+        req.wait()
+
 class TestRPC(unittest.TestCase):
 
     @classmethod
@@ -21,6 +26,9 @@ class TestRPC(unittest.TestCase):
         cls.hello_world = cls.engine.register(
             'hello_world',
             cls.receiver.hello_world)
+        cls.ihello_world = cls.engine.register(
+            'ihello_world',
+            cls.receiver.ihello_world)
 
     @classmethod
     def tearDownClass(cls):
@@ -55,6 +63,14 @@ class TestRPC(unittest.TestCase):
         self.assertIsInstance(req, ForwardRequest)
         self.assertIsInstance(req.test(), bool)
         req.wait()
+
+    def test_call_response_async(self):
+        engine = TestRPC.engine
+        ihello_world = TestRPC.ihello_world
+        addr = engine.address
+        rpc = ihello_world.on(addr)
+        resp = rpc('Matthieu', lastname='Dorier')
+        self.assertEqual(resp, 'Hello Matthieu Dorier')
 
     def test_deregister(self):
         engine = TestRPC.engine

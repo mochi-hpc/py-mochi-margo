@@ -641,6 +641,26 @@ static void pymargo_bulk_transfer(
     }
 }
 
+static pymargo_request pymargo_bulk_itransfer(
+        pymargo_instance_id mid,
+        pymargo_bulk_xfer_mode op,
+        pymargo_addr origin_addr,
+        pymargo_bulk origin_handle,
+        size_t origin_offset,
+        pymargo_bulk local_handle,
+        size_t local_offset,
+        size_t size) {
+
+    margo_request req;
+    hg_return_t ret = margo_bulk_itransfer(mid, static_cast<hg_bulk_op_t>(op), origin_addr,
+            origin_handle, origin_offset, local_handle, local_offset, size, &req);
+
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_bulk_itransfer", ret);
+    }
+    return req;
+}
+
 static std::string pymargo_bulk_to_base64(
         pymargo_bulk handle, bool request_eager) {
     hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
@@ -1033,6 +1053,7 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("bulk_free",                &pymargo_bulk_free);
     m.def("bulk_ref_incr",            &pymargo_bulk_ref_incr);
     m.def("bulk_transfer",            &pymargo_bulk_transfer);
+    m.def("bulk_itransfer",           &pymargo_bulk_itransfer);
     m.def("bulk_to_base64",           &pymargo_bulk_to_base64);
     m.def("base64_to_bulk",           &pymargo_base64_to_bulk);
     m.def("bulk_to_str",              &pymargo_bulk_to_str);

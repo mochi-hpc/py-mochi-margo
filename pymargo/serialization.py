@@ -3,7 +3,7 @@
 
 import pickle
 from typing import Any
-from .typing import hg_addr_t, hg_bulk_t, margo_instance_id
+from .typing import margo_instance_id
 from .bulk import Bulk
 
 

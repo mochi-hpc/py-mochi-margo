@@ -45,7 +45,8 @@ class TestProvider(unittest.TestCase):
         rpcs = engine.register_provider(provider, provider_id=42)
         self.assertIn('my_hello_world', rpcs)
         self.assertIn('hello_someone', rpcs)
-        rpcs = engine.register_provider(provider, service_name='abc', provider_id=43)
+        rpcs = engine.register_provider(provider, service_name='abc',
+                                        provider_id=43)
         self.assertIn('abc_my_hello_world', rpcs)
         self.assertIn('abc_hello_someone', rpcs)
 

@@ -1,6 +1,7 @@
 import unittest
 import os
-from pymargo.core import Engine, RemoteFunction, CallableRemoteFunction, ForwardRequest
+from pymargo.core import Engine, RemoteFunction, \
+                         CallableRemoteFunction, ForwardRequest
 
 
 class Receiver():
@@ -15,6 +16,7 @@ class Receiver():
         req = handle.irespond(f'Hello {firstname} {lastname}')
         req.test()
         req.wait()
+
 
 class TestRPC(unittest.TestCase):
 

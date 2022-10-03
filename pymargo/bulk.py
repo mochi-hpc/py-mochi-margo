@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Optional
 from .typing import hg_bulk_t, margo_instance_id
 
 if TYPE_CHECKING:
-    from .core import Engine
+    from .core import Engine  # noqa: F401
 
 """
 Tags to indicate what type of operations are expected from a Bulk handle.

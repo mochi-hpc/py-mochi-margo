@@ -12,7 +12,8 @@ class Receiver():
 
     def pull_from_bulk(self, handle, bulk, size):
         local_data = bytes(size)
-        local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.write_only)
+        local_bulk = self.engine.create_bulk(
+            local_data, pymargo.bulk.write_only)
         self.engine.transfer(
             op=pymargo.bulk.pull,
             origin_addr=handle.address,
@@ -25,7 +26,8 @@ class Receiver():
 
     def push_to_bulk(self, handle, bulk, size):
         local_data = b'more'
-        local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.read_only)
+        local_bulk = self.engine.create_bulk(
+            local_data, pymargo.bulk.read_only)
         self.engine.transfer(
             op=pymargo.bulk.push,
             origin_addr=handle.address,
@@ -38,7 +40,8 @@ class Receiver():
 
     def ipull_from_bulk(self, handle, bulk, size):
         local_data = bytes(size)
-        local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.write_only)
+        local_bulk = self.engine.create_bulk(
+            local_data, pymargo.bulk.write_only)
         self.engine.itransfer(
             op=pymargo.bulk.pull,
             origin_addr=handle.address,
@@ -51,7 +54,8 @@ class Receiver():
 
     def ipush_to_bulk(self, handle, bulk, size):
         local_data = b'more'
-        local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.read_only)
+        local_bulk = self.engine.create_bulk(
+            local_data, pymargo.bulk.read_only)
         self.engine.itransfer(
             op=pymargo.bulk.push,
             origin_addr=handle.address,
@@ -61,6 +65,7 @@ class Receiver():
             local_offset=0,
             size=4).wait()
         handle.respond()
+
 
 class TestBulk(unittest.TestCase):
 

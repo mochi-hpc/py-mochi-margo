@@ -4,7 +4,7 @@ import _pymargo
 import types
 import json
 from typing import Type, Callable, Any, List, Mapping, Union, Optional
-from .typing import hg_addr_t, hg_bulk_t, margo_instance_id, margo_request
+from .typing import hg_addr_t, margo_instance_id, margo_request
 from .bulk import Bulk
 from .logging import Logger
 from .serialization import loads, dumps
@@ -169,7 +169,7 @@ class CallableRemoteFunction:
         return self._provider_id
 
     def _forward(self, *args: List[Any], timeout: float = 0.0,
-                **kwargs: Mapping[str, Any]) -> Any:
+                 **kwargs: Mapping[str, Any]) -> Any:
         data = {
             'args': args,
             'kwargs': kwargs
@@ -634,7 +634,6 @@ def remote(rpc_name: Optional[str] = None,
     """
     def decorator(func):
         name = rpc_name
-        sname = service_name
         if name is None:
             if isinstance(func, types.MethodType):
                 name = func.__func__.__name__

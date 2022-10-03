@@ -1,4 +1,5 @@
 import unittest
+import os
 from pymargo.core import Engine, Address
 
 
@@ -6,7 +7,8 @@ class TestAddr(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        cls.engine = Engine(protocol)
 
     @classmethod
     def tearDownClass(cls):
@@ -23,7 +25,8 @@ class TestAddr(unittest.TestCase):
         engine = TestAddr.engine
         addr = str(engine.address)
         self.assertIsInstance(addr, str)
-        self.assertTrue('na+sm' in addr)
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        self.assertTrue(protocol in addr)
 
     def test_addr_eql(self):
         engine = TestAddr.engine

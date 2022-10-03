@@ -1,4 +1,5 @@
 import unittest
+import os
 import sys
 from pymargo.core import Engine, remote, provider
 
@@ -31,7 +32,8 @@ class TestProvider(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        cls.engine = Engine(protocol)
 
     @classmethod
     def tearDownClass(cls):

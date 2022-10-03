@@ -102,7 +102,7 @@ def __Handle_get_Address(h: _pymargo.Handle) -> Address:
     return Address(mid, addr, need_del=False).copy()
 
 
-def __Handle_respond(h: _pymargo.Handle, data: Any) -> None:
+def __Handle_respond(h: _pymargo.Handle, data: Any = None) -> None:
     """
     This function calls h._respond with pickled data.
     """
@@ -147,14 +147,15 @@ class CallableRemoteFunction:
     def provider_id(self) -> int:
         return self._provider_id
 
-    def __call__(self, *args: List[Any],
+    def __call__(self, *args: List[Any], timeout: float = 0.0,
                  **kwargs: Mapping[str, Any]):
         data = {
             'args': args,
             'kwargs': kwargs
         }
         raw_data = pickle.dumps(data)
-        raw_response = self.handle._forward(self.provider_id, raw_data)
+        raw_response = self.handle._forward(provider_id=self.provider_id,
+                                            input=raw_data, timeout=timeout)
         if raw_response is None:
             return None
         return pickle.loads(raw_response)  # type: ignore
@@ -506,6 +507,13 @@ class Engine:
         Hint that the address is no longer valid.
         """
         _pymargo.addr_set_remove(self._mid, address.hg_addr)
+
+    def sleep(self, delay: float) -> None:
+        """
+        Sleep for the specified number of seconds,
+        yielding to other Argobots threads.
+        """
+        _pymargo.sleep(self._mid, delay)
 
 
 def remote(rpc_name: Optional[str] = None,

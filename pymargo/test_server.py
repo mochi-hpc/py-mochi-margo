@@ -1,11 +1,13 @@
 import unittest
+import os
 from pymargo.core import Engine
 
 
 class TestInitEngine(unittest.TestCase):
 
     def test_init_engine(self):
-        engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
         self.assertIsInstance(engine, Engine)
         self.assertTrue(engine.listening)
         engine.finalize()
@@ -25,7 +27,8 @@ class TestInitEngine(unittest.TestCase):
     def test_on_finalize(self):
         finalize_callback = TestInitEngine.FinalizeCallback()
         self.assertFalse(finalize_callback.finalize_was_called)
-        engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
         engine.on_finalize(finalize_callback)
         self.assertFalse(finalize_callback.finalize_was_called)
         engine.finalize()

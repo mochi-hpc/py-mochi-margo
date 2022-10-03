@@ -1,22 +1,36 @@
 import unittest
+import os
 from pymargo.core import Engine, RemoteFunction, CallableRemoteFunction
 
 
 class Receiver():
 
+    def __init__(self, engine):
+        self.engine = engine
+
     def hello_world(self, handle, firstname, lastname):
         handle.respond(f'Hello {firstname} {lastname}')
 
+    def timeout_rpc(self, handle, arg):
+        print("AAA")
+        self.engine.sleep(2000.0)
+        print("BBB")
+        handle.respond('bla')
+        print("CCC")
 
 class TestRPC(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.receiver = Receiver()
-        cls.engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        cls.engine = Engine(protocol)
+        cls.receiver = Receiver(cls.engine)
         cls.hello_world = cls.engine.register(
             'hello_world',
             cls.receiver.hello_world)
+        cls.timeout_rpc = cls.engine.register(
+            'timeout_rpc',
+            cls.receiver.timeout_rpc)
 
     @classmethod
     def tearDownClass(cls):
@@ -43,7 +57,7 @@ class TestRPC(unittest.TestCase):
 
     def test_deregister(self):
         engine = TestRPC.engine
-        receiver = Receiver()
+        receiver = Receiver(engine)
         rpc = engine.register('something', receiver.hello_world)
         self.assertIsInstance(engine.registered('something'), RemoteFunction)
         rpc.deregister()

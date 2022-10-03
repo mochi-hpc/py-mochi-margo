@@ -5,6 +5,7 @@ import types
 import json
 import pickle
 from typing import Type, Callable, Any, List, Mapping, Union, Optional
+from .typing import hg_addr_t, hg_bulk_t, margo_instance_id, margo_request
 from .bulk import Bulk
 from .logging import Logger
 
@@ -33,8 +34,8 @@ class Address:
     Address class, represents the network address of an Engine.
     """
 
-    def __init__(self, mid: _pymargo.margo_instance_id,
-                 hg_addr: _pymargo.hg_addr_t,
+    def __init__(self, mid: margo_instance_id,
+                 hg_addr: hg_addr_t,
                  need_del: bool = True):
         """
         Constructor. This method is not supposed to be called
@@ -82,14 +83,14 @@ class Address:
         """
         _pymargo.shutdown_remote_instance(self._mid, self._hg_addr)
 
-    def get_internal_hg_addr(self) -> _pymargo.hg_addr_t:
+    def get_internal_hg_addr(self) -> hg_addr_t:
         """
         Get the internal hg_addr handle.
         """
         return self._hg_addr
 
     @property
-    def hg_addr(self) -> _pymargo.hg_addr_t:
+    def hg_addr(self) -> hg_addr_t:
         return self._hg_addr
 
 
@@ -98,20 +99,20 @@ class Request:
     Generic Request wrapper for non-blocking operations.
     """
 
-    def __init__(self, req: _pymargo.margo_request):
+    def __init__(self, req: margo_request):
         self._req = req
 
     def wait(self):
         """
         Wait for the request to complete.
         """
-        self._req.wait()
+        _pymargo.request_wait(self._req)
 
     def test(self):
         """
         Test if the request has completed.
         """
-        return self._req.test()
+        return _pymargo.request_test(self._req)
 
 
 class ForwardRequest(Request):
@@ -120,7 +121,7 @@ class ForwardRequest(Request):
     been obtained via a forward calls.
     """
 
-    def __init__(self, req: _pymargo.margo_request,
+    def __init__(self, req: margo_request,
                  handle: _pymargo.Handle):
         super().__init__(req)
         self._handle = handle
@@ -572,14 +573,14 @@ class Engine:
             origin_offset, local_handle._hg_bulk, local_offset, size)
         return Request(req)
 
-    def get_internal_mid(self) -> _pymargo.margo_instance_id:
+    def get_internal_mid(self) -> margo_instance_id:
         """
         Returns the internal margo_instance_id.
         """
         return self._mid
 
     @property
-    def mid(self) -> _pymargo.margo_instance_id:
+    def mid(self) -> margo_instance_id:
         """
         Returns the internal margo_instance_id.
         """

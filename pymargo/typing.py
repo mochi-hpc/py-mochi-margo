@@ -19,3 +19,4 @@ PyCapsule = __get_capsule_type()
 margo_instance_id = PyCapsule
 hg_addr_t = PyCapsule
 hg_bulk_t = PyCapsule
+margo_request = PyCapsule

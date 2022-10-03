@@ -5,7 +5,6 @@ import types
 import json
 import pickle
 from typing import Type, Callable, Any, List, Mapping, Union, Optional
-from .typing import margo_instance_id, hg_addr_t
 from .bulk import Bulk
 from .logging import Logger
 
@@ -34,7 +33,8 @@ class Address:
     Address class, represents the network address of an Engine.
     """
 
-    def __init__(self, mid: margo_instance_id, hg_addr: hg_addr_t,
+    def __init__(self, mid: _pymargo.margo_instance_id,
+                 hg_addr: _pymargo.hg_addr_t,
                  need_del: bool = True):
         """
         Constructor. This method is not supposed to be called
@@ -82,14 +82,14 @@ class Address:
         """
         _pymargo.shutdown_remote_instance(self._mid, self._hg_addr)
 
-    def get_internal_hg_addr(self) -> hg_addr_t:
+    def get_internal_hg_addr(self) -> _pymargo.hg_addr_t:
         """
         Get the internal hg_addr handle.
         """
         return self._hg_addr
 
     @property
-    def hg_addr(self) -> hg_addr_t:
+    def hg_addr(self) -> _pymargo.hg_addr_t:
         return self._hg_addr
 
 
@@ -116,6 +116,47 @@ and use the pickle module, respectively
 """
 setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
 setattr(_pymargo.Handle, "respond", __Handle_respond)
+
+
+class Request:
+    """
+    Generic Request wrapper for non-blocking operations.
+    """
+
+    def __init__(self, req: _pymargo.margo_request):
+        self._req = req
+
+    def wait(self):
+        """
+        Wait for the request to complete.
+        """
+        self._req.wait()
+
+    def test(self):
+        """
+        Test if the request has completed.
+        """
+        return self._req.test()
+
+
+class ForwardRequest(Request):
+    """
+    A ForwardRequest object wraps a request that has
+    been obtained via a forward calls.
+    """
+
+    def __init__(self, req: _pymargo.margo_request,
+                 handle: _pymargo.Handle):
+        super().__init__(req)
+        self._handle = handle
+
+    def wait(self):
+        """
+        Wait for the request to complete and return
+        the output of the RPC.
+        """
+        super().wait()
+        return self._handle._get_output()
 
 
 class CallableRemoteFunction:
@@ -147,8 +188,8 @@ class CallableRemoteFunction:
     def provider_id(self) -> int:
         return self._provider_id
 
-    def __call__(self, *args: List[Any], timeout: float = 0.0,
-                 **kwargs: Mapping[str, Any]):
+    def _forward(self, *args: List[Any], timeout: float = 0.0,
+                **kwargs: Mapping[str, Any]) -> Any:
         data = {
             'args': args,
             'kwargs': kwargs
@@ -159,6 +200,24 @@ class CallableRemoteFunction:
         if raw_response is None:
             return None
         return pickle.loads(raw_response)  # type: ignore
+
+    def _iforward(self, *args: List[Any], timeout: float = 0.0,
+                  **kwargs: Mapping[str, Any]) -> Any:
+        data = {
+            'args': args,
+            'kwargs': kwargs
+        }
+        raw_data = pickle.dumps(data)
+        req = self.handle._iforward(provider_id=self.provider_id,
+                                    input=raw_data, timeout=timeout)
+        return ForwardRequest(req, self._handle)
+
+    def __call__(self, *args: List[Any], timeout: float = 0.0,
+                 blocking=True, **kwargs: Mapping[str, Any]) -> Any:
+        if blocking:
+            return self._forward(*args, timeout=timeout, **kwargs)
+        else:
+            return self._iforward(*args, timeout=timeout, **kwargs)
 
 
 class RemoteFunction:
@@ -481,14 +540,14 @@ class Engine:
             self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
             origin_offset, local_handle._hg_bulk, local_offset, size)
 
-    def get_internal_mid(self) -> margo_instance_id:
+    def get_internal_mid(self) -> _pymargo.margo_instance_id:
         """
         Returns the internal margo_instance_id.
         """
         return self._mid
 
     @property
-    def mid(self) -> margo_instance_id:
+    def mid(self) -> _pymargo.margo_instance_id:
         """
         Returns the internal margo_instance_id.
         """

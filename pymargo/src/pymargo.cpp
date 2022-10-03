@@ -48,6 +48,7 @@ struct pymargo_hg_handle {
     pymargo_request iforward(uint16_t provider_id, py11::bytes input, double timeout);
     void respond(py11::bytes output);
     pymargo_instance_id _get_mid() const;
+    py11::object _get_output() const;
 };
 
 void delete_rpc_data(void* arg) {
@@ -474,7 +475,6 @@ py11::object pymargo_hg_handle::forward(uint16_t provider_id,
                                         py11::bytes input,
                                         double timeout)
 {
-    int disabled_flag;
     hg_return_t ret;
 
     Py_BEGIN_ALLOW_THREADS
@@ -483,6 +483,12 @@ py11::object pymargo_hg_handle::forward(uint16_t provider_id,
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_provider_forward_timed", ret);
     }
+    return _get_output();
+}
+
+py11::object pymargo_hg_handle::_get_output() const {
+    hg_return_t ret;
+    int disabled_flag;
     auto mid = margo_hg_handle_get_instance(handle);
     auto info = margo_get_info(handle);
 
@@ -965,6 +971,7 @@ PYBIND11_MODULE(_pymargo, m)
              "provider_id"_a=0, "input"_a=py11::bytes(), "timeout"_a=0.0)
         .def("_iforward", &pymargo_hg_handle::iforward,
              "provider_id"_a=0, "input"_a=py11::bytes(), "timeout"_a=0.0)
+        .def("_get_output", &pymargo_hg_handle::_get_output)
         .def("_respond", &pymargo_hg_handle::respond)
         .def("_get_mid", &pymargo_hg_handle::_get_mid)
         ;

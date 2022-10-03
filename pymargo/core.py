@@ -156,7 +156,10 @@ class ForwardRequest(Request):
         the output of the RPC.
         """
         super().wait()
-        return self._handle._get_output()
+        raw_output = self._handle._get_output()
+        if raw_output is None:
+            return None
+        return pickle.loads(raw_output)  # type: ignore
 
 
 class CallableRemoteFunction:

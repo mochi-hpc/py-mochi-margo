@@ -1,6 +1,6 @@
 import unittest
 import os
-from pymargo.core import Engine, RemoteFunction, CallableRemoteFunction
+from pymargo.core import Engine, RemoteFunction, CallableRemoteFunction, ForwardRequest
 
 
 class Receiver():
@@ -44,6 +44,15 @@ class TestRPC(unittest.TestCase):
         addr = engine.address
         rpc = hello_world.on(addr)
         rpc('Matthieu', lastname='Dorier')
+
+    def test_call_rpc_async(self):
+        engine = TestRPC.engine
+        hello_world = TestRPC.hello_world
+        addr = engine.address
+        rpc = hello_world.on(addr)
+        req = rpc('Matthieu', lastname='Dorier', blocking=False)
+        self.assertIsInstance(req, ForwardRequest)
+        req.wait()
 
     def test_deregister(self):
         engine = TestRPC.engine

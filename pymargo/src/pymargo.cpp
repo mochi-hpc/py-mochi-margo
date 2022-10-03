@@ -543,6 +543,16 @@ pymargo_instance_id pymargo_hg_handle::_get_mid() const
     }                                                 \
 } while(0)
 
+static py11::str pymargo_get_config(pymargo_instance_id mid) {
+    char* config = margo_get_config(mid);
+    if(!config) return py11::str();
+    else {
+        auto result = py11::str(config);
+        free(config);
+        return result;
+    }
+}
+
 pymargo_bulk pymargo_bulk_create(
         pymargo_instance_id mid,
         const py11::buffer& data,
@@ -949,6 +959,7 @@ PYBIND11_MODULE(_pymargo, m)
             py11::gil_scoped_release release;
             margo_shutdown_remote_instance(mid, addr);
     });
+    m.def("get_config", pymargo_get_config);
     m.def("register",                 &pymargo_register);
     m.def("register_on_client",       &pymargo_register_on_client);
     m.def("registered",               &pymargo_registered);

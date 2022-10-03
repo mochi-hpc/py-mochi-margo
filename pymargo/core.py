@@ -515,6 +515,14 @@ class Engine:
         """
         _pymargo.sleep(self._mid, delay)
 
+    @property
+    def config(self) -> dict:
+        config_str = _pymargo.get_config(self._mid)
+        if config_str is None:
+            return None
+        import json
+        return json.loads(config_str)
+
 
 def remote(rpc_name: Optional[str] = None,
            disable_response: Optional[bool] = False,

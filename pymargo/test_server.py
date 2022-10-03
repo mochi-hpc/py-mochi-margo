@@ -12,9 +12,22 @@ class TestInitEngine(unittest.TestCase):
         self.assertTrue(engine.listening)
         engine.finalize()
 
+    def test_engine_config(self):
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
+        self.assertIsInstance(engine, Engine)
+        config = engine.config
+        self.assertIsInstance(config, dict)
+        self.assertIn('argobots', config)
+        engine.finalize()
+
     def test_init_engine_fail(self):
         with self.assertRaises(RuntimeError):
             Engine('abc')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
+        self.assertIsInstance(engine, Engine)
+        engine.finalize()
 
     class FinalizeCallback():
 

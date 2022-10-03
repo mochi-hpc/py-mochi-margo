@@ -11,13 +11,6 @@ class Receiver():
     def hello_world(self, handle, firstname, lastname):
         handle.respond(f'Hello {firstname} {lastname}')
 
-    def timeout_rpc(self, handle, arg):
-        print("AAA")
-        self.engine.sleep(2000.0)
-        print("BBB")
-        handle.respond('bla')
-        print("CCC")
-
 class TestRPC(unittest.TestCase):
 
     @classmethod
@@ -28,9 +21,6 @@ class TestRPC(unittest.TestCase):
         cls.hello_world = cls.engine.register(
             'hello_world',
             cls.receiver.hello_world)
-        cls.timeout_rpc = cls.engine.register(
-            'timeout_rpc',
-            cls.receiver.timeout_rpc)
 
     @classmethod
     def tearDownClass(cls):

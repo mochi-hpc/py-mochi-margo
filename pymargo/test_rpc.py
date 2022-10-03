@@ -52,6 +52,7 @@ class TestRPC(unittest.TestCase):
         rpc = hello_world.on(addr)
         req = rpc('Matthieu', lastname='Dorier', blocking=False)
         self.assertIsInstance(req, ForwardRequest)
+        self.assertIsInstance(req.test(), bool)
         req.wait()
 
     def test_deregister(self):

@@ -1,6 +1,5 @@
 import _pymargo
 from typing import TYPE_CHECKING
-from .typing import hg_bulk_t
 
 if TYPE_CHECKING:
     from .core import Engine
@@ -25,7 +24,7 @@ class Bulk:
     enable serialization/deserialization to send them in RPCs.
     """
 
-    def __init__(self, engine: 'Engine', hg_bulk: hg_bulk_t):
+    def __init__(self, engine: 'Engine', hg_bulk: _pymargo.hg_bulk_t):
         """
         Constructor. This method is not supposed to be called by users.
         Users must call Engine.create_bulk instead.
@@ -39,7 +38,8 @@ class Bulk:
         """
         Destructor. Frees the underlying hg_bulk_t handle.
         """
-        _pymargo.bulk_free(self._hg_bulk)
+        if hasattr(self, '_hg_bulk'):
+            _pymargo.bulk_free(self._hg_bulk)
 
     def to_base64(self, eager: bool = False) -> str:
         """

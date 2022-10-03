@@ -229,6 +229,7 @@ and respond functions must added this way to return an Address object
 and use the pickle module, respectively
 """
 setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
+setattr(_pymargo.Handle, "address", property(__Handle_get_Address))
 setattr(_pymargo.Handle, "respond", __Handle_respond)
 setattr(_pymargo.Handle, "irespond", __Handle_irespond)
 

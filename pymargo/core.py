@@ -3,11 +3,11 @@
 import _pymargo
 import types
 import json
-import pickle
 from typing import Type, Callable, Any, List, Mapping, Union, Optional
 from .typing import hg_addr_t, hg_bulk_t, margo_instance_id, margo_request
 from .bulk import Bulk
 from .logging import Logger
+from .serialization import loads, dumps
 
 
 """
@@ -135,7 +135,8 @@ class ForwardRequest(Request):
         raw_output = self._handle._get_output()
         if raw_output is None:
             return None
-        return pickle.loads(raw_output)  # type: ignore
+        mid = self._handle._get_mid()
+        return loads(mid, raw_output)  # type: ignore
 
 
 class CallableRemoteFunction:
@@ -173,12 +174,14 @@ class CallableRemoteFunction:
             'args': args,
             'kwargs': kwargs
         }
-        raw_data = pickle.dumps(data)
+        mid = self._handle._get_mid()
+        raw_data = dumps(mid, data)
         raw_response = self.handle._forward(provider_id=self.provider_id,
                                             input=raw_data, timeout=timeout)
         if raw_response is None:
             return None
-        return pickle.loads(raw_response)  # type: ignore
+        mid = self._handle._get_mid()
+        return loads(mid, raw_response)  # type: ignore
 
     def _iforward(self, *args: List[Any], timeout: float = 0.0,
                   **kwargs: Mapping[str, Any]) -> Any:
@@ -186,7 +189,8 @@ class CallableRemoteFunction:
             'args': args,
             'kwargs': kwargs
         }
-        raw_data = pickle.dumps(data)
+        mid = self._handle._get_mid()
+        raw_data = dumps(mid, data)
         req = self.handle._iforward(provider_id=self.provider_id,
                                     input=raw_data, timeout=timeout)
         return ForwardRequest(req, self._handle)
@@ -212,7 +216,9 @@ def __Handle_respond(h: _pymargo.Handle, data: Any = None) -> None:
     """
     This function calls h._respond with pickled data.
     """
-    h._respond(pickle.dumps(data))
+    mid = h._get_mid()
+    raw_data = dumps(mid, data)
+    h._respond(raw_data)
 
 
 def __Handle_irespond(h: _pymargo.Handle, data: Any = None) -> Request:
@@ -220,7 +226,9 @@ def __Handle_irespond(h: _pymargo.Handle, data: Any = None) -> Request:
     This function calls h._irespond with picked data
     and wraps the resuting margo_request into a Request object.
     """
-    req = h._irespond(pickle.dumps(data))
+    mid = h._get_mid()
+    raw_data = dumps(mid, data)
+    req = h._irespond(raw_data)
     return Request(req)
 
 
@@ -451,7 +459,8 @@ class Engine:
                 the_rpc_name = str(rpc_name)
 
             def wrapper(handle, raw_input_data):
-                input_data = pickle.loads(raw_input_data)
+                mid = handle._get_mid()
+                input_data = loads(mid, raw_input_data)
                 args = input_data['args']
                 kwargs = input_data['kwargs']
                 func(handle, *args, **kwargs)
@@ -536,7 +545,7 @@ class Engine:
         Returns a Bulk object.
         """
         blk = _pymargo.bulk_create(self._mid, array, mode)
-        return Bulk(self, blk)
+        return Bulk(blk)
 
     def transfer(self, op: _pymargo.xfer, origin_addr: Address,
                  origin_handle: Bulk, origin_offset: int,

@@ -10,56 +10,52 @@ class Receiver():
     def __init__(self, engine):
         self.engine = engine
 
-    def pull_from_bulk(self, handle, serialized_bulk, size):
-        remote_bulk = Bulk.from_bytes(self.engine, serialized_bulk)
+    def pull_from_bulk(self, handle, bulk, size):
         local_data = bytes(size)
         local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.write_only)
         self.engine.transfer(
             op=pymargo.bulk.pull,
             origin_addr=handle.address,
-            origin_handle=remote_bulk,
+            origin_handle=bulk,
             origin_offset=0,
             local_handle=local_bulk,
             local_offset=0,
             size=size)
         handle.respond(local_data == b'This is some bytes data')
 
-    def push_to_bulk(self, handle, serialized_bulk, size):
-        remote_bulk = Bulk.from_bytes(self.engine, serialized_bulk)
+    def push_to_bulk(self, handle, bulk, size):
         local_data = b'more'
         local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.read_only)
         self.engine.transfer(
             op=pymargo.bulk.push,
             origin_addr=handle.address,
-            origin_handle=remote_bulk,
+            origin_handle=bulk,
             origin_offset=8,
             local_handle=local_bulk,
             local_offset=0,
             size=4)
         handle.respond()
 
-    def ipull_from_bulk(self, handle, serialized_bulk, size):
-        remote_bulk = Bulk.from_bytes(self.engine, serialized_bulk)
+    def ipull_from_bulk(self, handle, bulk, size):
         local_data = bytes(size)
         local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.write_only)
         self.engine.itransfer(
             op=pymargo.bulk.pull,
             origin_addr=handle.address,
-            origin_handle=remote_bulk,
+            origin_handle=bulk,
             origin_offset=0,
             local_handle=local_bulk,
             local_offset=0,
             size=size).wait()
         handle.respond(local_data == b'This is some bytes data')
 
-    def ipush_to_bulk(self, handle, serialized_bulk, size):
-        remote_bulk = Bulk.from_bytes(self.engine, serialized_bulk)
+    def ipush_to_bulk(self, handle, bulk, size):
         local_data = b'more'
         local_bulk = self.engine.create_bulk(local_data, pymargo.bulk.read_only)
         self.engine.itransfer(
             op=pymargo.bulk.push,
             origin_addr=handle.address,
-            origin_handle=remote_bulk,
+            origin_handle=bulk,
             origin_offset=8,
             local_handle=local_bulk,
             local_offset=0,
@@ -98,7 +94,7 @@ class TestBulk(unittest.TestCase):
         data = b'This is some bytes data'
         bulk = TestBulk.engine.create_bulk(data, pymargo.bulk.read_only)
         rpc = pull_from_bulk.on(addr)
-        resp = rpc(serialized_bulk=bulk.to_bytes(), size=len(data))
+        resp = rpc(bulk=bulk, size=len(data))
         self.assertEqual(resp, True)
 
     def test_push(self):
@@ -108,7 +104,7 @@ class TestBulk(unittest.TestCase):
         data = b'This is some bytes data'
         bulk = TestBulk.engine.create_bulk(data, pymargo.bulk.write_only)
         rpc = push_to_bulk.on(addr)
-        rpc(serialized_bulk=bulk.to_bytes(), size=len(data))
+        rpc(bulk=bulk, size=len(data))
         self.assertEqual(data, b'This is more bytes data')
 
     def test_ipull(self):
@@ -118,7 +114,7 @@ class TestBulk(unittest.TestCase):
         data = b'This is some bytes data'
         bulk = TestBulk.engine.create_bulk(data, pymargo.bulk.read_only)
         rpc = pull_from_bulk.on(addr)
-        resp = rpc(serialized_bulk=bulk.to_bytes(), size=len(data))
+        resp = rpc(bulk=bulk, size=len(data))
         self.assertEqual(resp, True)
 
     def test_ipush(self):
@@ -128,7 +124,7 @@ class TestBulk(unittest.TestCase):
         data = b'This is some bytes data'
         bulk = TestBulk.engine.create_bulk(data, pymargo.bulk.write_only)
         rpc = push_to_bulk.on(addr)
-        rpc(serialized_bulk=bulk.to_bytes(), size=len(data))
+        rpc(bulk=bulk, size=len(data))
         self.assertEqual(data, b'This is more bytes data')
 
 

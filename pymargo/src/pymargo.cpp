@@ -10,7 +10,6 @@
 #include <iostream>
 #include <mercury_proc_string.h>
 #include <margo.h>
-#include "base64.hpp"
 
 namespace py11 = pybind11;
 namespace np = py11;
@@ -660,18 +659,6 @@ static pymargo_request pymargo_bulk_itransfer(
     return REQ2CAPSULE(req);
 }
 
-static std::string pymargo_bulk_to_base64(
-        pymargo_bulk handle, bool request_eager) {
-    hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
-    hg_size_t buf_size = margo_bulk_get_serialize_size(handle, flag);
-    std::string raw_buf(buf_size, '\0');
-    hg_return_t ret = margo_bulk_serialize(const_cast<char*>(raw_buf.data()), buf_size, flag, handle);
-    if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_bulk_serialize", ret);
-    }
-    return pymargo_base64_encode(reinterpret_cast<unsigned char const*>(raw_buf.data()), buf_size);
-}
-
 static py11::bytes pymargo_bulk_to_str(
         pymargo_bulk handle, bool request_eager) {
 
@@ -683,22 +670,6 @@ static py11::bytes pymargo_bulk_to_str(
         throw pymargo_exception("margo_bulk_serialize", ret);
     }
     return raw_buf;
-}
-
-static pymargo_bulk pymargo_base64_to_bulk(
-        pymargo_instance_id mid,
-        const std::string& rep) {
-
-    std::string raw = pymargo_base64_decode(rep);
-
-    hg_bulk_t handle;
-    hg_return_t ret = margo_bulk_deserialize(mid, &handle, raw.data(), raw.size());
-
-    if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_bulk_deserialize", ret);
-    }
-
-    return BULK2CAPSULE(handle);
 }
 
 static pymargo_bulk pymargo_str_to_bulk(
@@ -1048,8 +1019,6 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("bulk_ref_incr",            &pymargo_bulk_ref_incr);
     m.def("bulk_transfer",            &pymargo_bulk_transfer);
     m.def("bulk_itransfer",           &pymargo_bulk_itransfer);
-    m.def("bulk_to_base64",           &pymargo_bulk_to_base64);
-    m.def("base64_to_bulk",           &pymargo_base64_to_bulk);
     m.def("bulk_to_str",              &pymargo_bulk_to_str);
     m.def("str_to_bulk",              &pymargo_str_to_bulk);
 

@@ -43,7 +43,8 @@ class TestRPC(unittest.TestCase):
         hello_world = TestRPC.hello_world
         addr = engine.address
         rpc = hello_world.on(addr)
-        rpc('Matthieu', lastname='Dorier')
+        resp = rpc('Matthieu', lastname='Dorier')
+        self.assertEqual(resp, 'Hello Matthieu Dorier')
 
     def test_call_rpc_async(self):
         engine = TestRPC.engine

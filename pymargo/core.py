@@ -484,15 +484,21 @@ class Engine:
                 service_name = \
                     provider_cls._pymargo_provider_info['service_name']
         funcs = [getattr(provider, f) for f in dir(provider)]
-        funcs = [f for f in funcs if hasattr(f, '_pymargo_info')]
+        finalize_funcs = [f for f in funcs if hasattr(f, '_pymargo_info_finalize')]
+        prefinalize_funcs = [f for f in funcs if hasattr(f, '_pymargo_info_prefinalize')]
+        rpc_funcs = [f for f in funcs if hasattr(f, '_pymargo_info')]
         result = {}
-        for func in funcs:
+        for func in rpc_funcs:
             if service_name is None:
                 service_name = func._pymargo_info['service_name']
             rpc_name = func._pymargo_info['rpc_name']
             if service_name is not None:
                 rpc_name = service_name + "_" + rpc_name
             result[rpc_name] = self.register(func=func, rpc_name=rpc_name)
+        for func in finalize_funcs:
+            self.on_finalize(func)
+        for func in prefinalize_funcs:
+            self.on_prefinalize(func)
         return result
 
     def registered(self, rpc_name: str,
@@ -660,3 +666,22 @@ def provider(service_name: Optional[str] = None):
         setattr(cls, '_pymargo_provider_info', _pymargo_info)
         return cls
     return decorator
+
+
+def on_finalize(func):
+    """
+    Decorator that adds information to a function to tell
+    pymargo that it should be registered to be called
+    when the engine is finalized.
+    """
+    func._pymargo_info_finalize = True
+    return func
+
+def on_prefinalize(func):
+    """
+    Decorator that adds information to a function to tell
+    pymargo that it should be registered to be called
+    when the engine is finalized.
+    """
+    func._pymargo_info_prefinalize = True
+    return func

@@ -1,6 +1,20 @@
 import unittest
 import os
-from pymargo.core import Engine
+from pymargo.core import Engine, on_finalize, on_prefinalize
+
+class MyProvider:
+
+    def __init__(self):
+        self._on_finalize_called = False
+        self._on_prefinalize_called = False
+
+    @on_finalize
+    def finalize(self):
+        self._on_finalize_called = True
+
+    @on_prefinalize
+    def prefinalize(self):
+        self._on_prefinalize_called = True
 
 
 class TestInitEngine(unittest.TestCase):
@@ -37,7 +51,7 @@ class TestInitEngine(unittest.TestCase):
         def __call__(self):
             self.finalize_was_called = True
 
-    def test_on_finalize(self):
+    def test_finalize_callback(self):
         finalize_callback = TestInitEngine.FinalizeCallback()
         self.assertFalse(finalize_callback.finalize_was_called)
         protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
@@ -46,6 +60,17 @@ class TestInitEngine(unittest.TestCase):
         self.assertFalse(finalize_callback.finalize_was_called)
         engine.finalize()
         self.assertTrue(finalize_callback.finalize_was_called)
+
+    def test_finalize_provider(self):
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
+        provider = MyProvider()
+        engine.register_provider(provider)
+        self.assertFalse(provider._on_finalize_called)
+        self.assertFalse(provider._on_prefinalize_called)
+        engine.finalize()
+        self.assertTrue(provider._on_finalize_called)
+        self.assertTrue(provider._on_prefinalize_called)
 
 
 if __name__ == '__main__':

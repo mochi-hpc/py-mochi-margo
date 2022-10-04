@@ -339,20 +339,20 @@ class Engine:
                  mode: _pymargo.mode = server,
                  use_progress_thread: bool = False,
                  num_rpc_threads: int = 0,
-                 options: Union[str, dict] = ""):
+                 config: Union[str, dict] = ""):
         """
         Constructor of the Engine class.
         addr : address of the Engine
         mode : pymargo.core.server or pymargo.core.client
         use_progress_thread : whether to use a progress execution stream or not
         num_rpc_threads : Number of RPC execution streams
-        options : options dictionary (or serialized in json)
+        config : config dictionary (or serialized in json)
         """
         self._finalized = True
-        if isinstance(options, dict):
-            opt = json.dumps(options)
+        if isinstance(config, dict):
+            opt = json.dumps(config)
         else:
-            opt = options
+            opt = config
         self._mid = _pymargo.init(
             addr, mode, use_progress_thread, num_rpc_threads, opt)
         self._finalized = False
@@ -494,7 +494,8 @@ class Engine:
             rpc_name = func._pymargo_info['rpc_name']
             if service_name is not None:
                 rpc_name = service_name + "_" + rpc_name
-            result[rpc_name] = self.register(func=func, rpc_name=rpc_name)
+            result[rpc_name] = self.register(func=func, rpc_name=rpc_name,
+                                             provider_id=provider_id)
         for func in finalize_funcs:
             self.on_finalize(func)
         for func in prefinalize_funcs:

@@ -246,6 +246,7 @@ static hg_id_t pymargo_register(
 
     pymargo_rpc_data* rpc_data = new pymargo_rpc_data;
     rpc_data->callable = callable;
+    rpc_data->callable.inc_ref();
 
     ret = margo_register_data(mid, rpc_id,
                 static_cast<void*>(rpc_data), delete_rpc_data);

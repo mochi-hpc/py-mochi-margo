@@ -42,28 +42,30 @@ class Receiver():
         local_data = bytes(size)
         local_bulk = self.engine.create_bulk(
             local_data, pymargo.bulk.write_only)
-        self.engine.itransfer(
+        self.engine.transfer(
             op=pymargo.bulk.pull,
             origin_addr=handle.address,
             origin_handle=bulk,
             origin_offset=0,
             local_handle=local_bulk,
             local_offset=0,
-            size=size).wait()
+            size=size,
+            blocking=False).wait()
         handle.respond(local_data == b'This is some bytes data')
 
     def ipush_to_bulk(self, handle, bulk, size):
         local_data = b'more'
         local_bulk = self.engine.create_bulk(
             local_data, pymargo.bulk.read_only)
-        self.engine.itransfer(
+        self.engine.transfer(
             op=pymargo.bulk.push,
             origin_addr=handle.address,
             origin_handle=bulk,
             origin_offset=8,
             local_handle=local_bulk,
             local_offset=0,
-            size=4).wait()
+            size=4,
+            blocking=False).wait()
         handle.respond()
 
 

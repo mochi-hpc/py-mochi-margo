@@ -556,7 +556,8 @@ class Engine:
 
     def transfer(self, op: _pymargo.xfer, origin_addr: Address,
                  origin_handle: Bulk, origin_offset: int,
-                 local_handle: Bulk, local_offset: int, size: int) -> None:
+                 local_handle: Bulk, local_offset: int, size: int,
+                 blocking: bool = True) -> Optional[Request]:
         """
         Transfers data between Bulk handles.
         op : bulk.push or bulk.pull
@@ -566,28 +567,20 @@ class Engine:
         local_handle : Bulk handle representing local memory
         local_offset : offset in local memory
         size : size of data to transfer
+        blocking : whether to block or return a Request to wait on
         """
-        _pymargo.bulk_transfer(
-            self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
-            origin_offset, local_handle._hg_bulk, local_offset, size)
-
-    def itransfer(self, op: _pymargo.xfer, origin_addr: Address,
-                  origin_handle: Bulk, origin_offset: int,
-                  local_handle: Bulk, local_offset: int, size: int) -> Request:
-        """
-        Transfers data between Bulk handles.
-        op : bulk.push or bulk.pull
-        origin_addr : instance of Address of the origin Bulk handle
-        origin_handle : remote bulk handle
-        origin_offset : offset at the origin
-        local_handle : Bulk handle representing local memory
-        local_offset : offset in local memory
-        size : size of data to transfer
-        """
-        req = _pymargo.bulk_itransfer(
-            self._mid, op, origin_addr._hg_addr, origin_handle._hg_bulk,
-            origin_offset, local_handle._hg_bulk, local_offset, size)
-        return Request(req)
+        if blocking:
+            _pymargo.bulk_transfer(
+                self._mid, op, origin_addr._hg_addr,
+                origin_handle._hg_bulk, origin_offset,
+                local_handle._hg_bulk, local_offset, size)
+            return None
+        else:
+            req = _pymargo.bulk_itransfer(
+                self._mid, op, origin_addr._hg_addr,
+                origin_handle._hg_bulk, origin_offset,
+                local_handle._hg_bulk, local_offset, size)
+            return Request(req)
 
     def get_internal_mid(self) -> margo_instance_id:
         """

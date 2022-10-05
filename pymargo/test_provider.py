@@ -10,7 +10,7 @@ class MyProvider:
     def hello_world(self, handle):
         handle.respond('Hello World')
 
-    @remote()
+    @remote
     def hello_someone(self, handle, firstname, lastname):
         handle.respond(f'Hello {firstname} {lastname}')
 

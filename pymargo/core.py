@@ -624,13 +624,9 @@ class Engine:
         return json.loads(config_str)
 
 
-def remote(rpc_name: Optional[str] = None,
-           disable_response: Optional[bool] = False,
-           service_name: Optional[str] = None):
-    """
-    Decorator that adds information to a function to tell
-    pymargo how it should be registeted as an RPC.
-    """
+def _remote(rpc_name: Optional[str] = None,
+            disable_response: Optional[bool] = False,
+            service_name: Optional[str] = None):
     def decorator(func):
         name = rpc_name
         if name is None:
@@ -645,6 +641,19 @@ def remote(rpc_name: Optional[str] = None,
         }
         return func
     return decorator
+
+
+def remote(*args, **kwargs):
+    """
+    Decorator that adds information to a function to tell
+    pymargo how it should be registeted as an RPC.
+    """
+    if len(args) == 1 and callable(args[0]):
+        # @remote
+        return _remote()(args[0])
+    else:
+        # @remote(...)
+        return _remote(*args, **kwargs)
 
 
 def provider(service_name: Optional[str] = None):

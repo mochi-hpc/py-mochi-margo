@@ -13,7 +13,7 @@ class Receiver():
         handle.respond(f'Hello {firstname} {lastname}')
 
     def ihello_world(self, handle, firstname, lastname):
-        req = handle.irespond(f'Hello {firstname} {lastname}')
+        req = handle.respond(f'Hello {firstname} {lastname}', blocking=False)
         req.test()
         req.wait()
 

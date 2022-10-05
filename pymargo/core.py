@@ -212,24 +212,19 @@ def __Handle_get_Address(h: _pymargo.Handle) -> Address:
     return Address(mid, addr, need_del=False).copy()
 
 
-def __Handle_respond(h: _pymargo.Handle, data: Any = None) -> None:
+def __Handle_respond(h: _pymargo.Handle, data: Any = None,
+                     blocking: bool = True) -> Optional[Request]:
     """
     This function calls h._respond with pickled data.
     """
     mid = h._get_mid()
     raw_data = dumps(mid, data)
-    h._respond(raw_data)
-
-
-def __Handle_irespond(h: _pymargo.Handle, data: Any = None) -> Request:
-    """
-    This function calls h._irespond with picked data
-    and wraps the resuting margo_request into a Request object.
-    """
-    mid = h._get_mid()
-    raw_data = dumps(mid, data)
-    req = h._irespond(raw_data)
-    return Request(req)
+    if blocking:
+        h._respond(raw_data)
+        return None
+    else:
+        req = h._irespond(raw_data)
+        return Request(req)
 
 
 """
@@ -240,7 +235,6 @@ and use the pickle module, respectively
 setattr(_pymargo.Handle, "get_addr", __Handle_get_Address)
 setattr(_pymargo.Handle, "address", property(__Handle_get_Address))
 setattr(_pymargo.Handle, "respond", __Handle_respond)
-setattr(_pymargo.Handle, "irespond", __Handle_irespond)
 
 
 class RemoteFunction:
@@ -484,8 +478,10 @@ class Engine:
                 service_name = \
                     provider_cls._pymargo_provider_info['service_name']
         funcs = [getattr(provider, f) for f in dir(provider)]
-        finalize_funcs = [f for f in funcs if hasattr(f, '_pymargo_info_finalize')]
-        prefinalize_funcs = [f for f in funcs if hasattr(f, '_pymargo_info_prefinalize')]
+        finalize_funcs = [f for f in funcs
+                          if hasattr(f, '_pymargo_info_finalize')]
+        prefinalize_funcs = [f for f in funcs
+                             if hasattr(f, '_pymargo_info_prefinalize')]
         rpc_funcs = [f for f in funcs if hasattr(f, '_pymargo_info')]
         result = {}
         for func in rpc_funcs:
@@ -670,6 +666,7 @@ def on_finalize(func):
     """
     func._pymargo_info_finalize = True
     return func
+
 
 def on_prefinalize(func):
     """

@@ -2,6 +2,7 @@ import unittest
 import os
 from pymargo.core import Engine, on_finalize, on_prefinalize
 
+
 class MyProvider:
 
     def __init__(self):

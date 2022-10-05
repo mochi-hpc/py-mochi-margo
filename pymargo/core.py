@@ -131,11 +131,14 @@ class ForwardRequest(Request):
         Wait for the request to complete and return
         the output of the RPC.
         """
+        if self._handle is None:
+            raise MargoException("Request already waited on")
         super().wait()
         raw_output = self._handle._get_output()
         if raw_output is None:
             return None
         mid = self._handle._get_mid()
+        self._handle = None
         return loads(mid, raw_output)  # type: ignore
 
 

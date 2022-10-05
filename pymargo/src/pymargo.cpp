@@ -10,7 +10,6 @@
 #include <iostream>
 #include <mercury_proc_string.h>
 #include <margo.h>
-#include "base64.hpp"
 
 namespace py11 = pybind11;
 namespace np = py11;
@@ -20,17 +19,19 @@ using namespace pybind11::literals;
 typedef py11::capsule pymargo_instance_id;
 typedef py11::capsule pymargo_addr;
 typedef py11::capsule pymargo_bulk;
+typedef py11::capsule pymargo_request;
 
 #define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id", nullptr)
 #define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t", nullptr)
 #define BULK2CAPSULE(__blk)  py11::capsule((void*)(__blk), "hg_bulk_t", nullptr)
+#define REQ2CAPSULE(__req)   py11::capsule((void*)(__req), "margo_request", nullptr)
 #define CAPSULE2MID(__caps)  (margo_instance_id)(__caps)
 #define CAPSULE2ADDR(__caps) (hg_addr_t)(__caps)
 #define CAPSULE2BULK(__caps) (hg_bulk_t)(__caps)
+#define CAPSULE2REQ(__caps)  (margo_request)(__caps)
 
 struct __attribute__ ((visibility("hidden"))) pymargo_rpc_data {
-    py11::object obj;
-    std::string method;
+    py11::object callable;
 };
 
 struct pymargo_hg_handle {
@@ -41,9 +42,12 @@ struct pymargo_hg_handle {
     ~pymargo_hg_handle();
     hg_id_t get_id() const;
     pymargo_addr _get_hg_addr() const;
-    py11::object forward(uint16_t provider_id, py11::bytes input);
+    py11::object forward(uint16_t provider_id, py11::bytes input, double timeout);
+    pymargo_request iforward(uint16_t provider_id, py11::bytes input, double timeout);
     void respond(py11::bytes output);
+    pymargo_request irespond(py11::bytes output);
     pymargo_instance_id _get_mid() const;
+    py11::object _get_output() const;
 };
 
 void delete_rpc_data(void* arg) {
@@ -207,8 +211,7 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
         try {
             pymargo_hg_handle pyhandle(handle);
             margo_ref_incr(handle);
-            py11::object fun = rpc_data->obj.attr(rpc_data->method.c_str());
-            py11::object r = fun(pyhandle, input);
+            py11::object r = rpc_data->callable(pyhandle, input);
         } catch(const py11::error_already_set& e) {
             std::cerr << "[Py-Margo] ERROR: " << e.what() << std::endl;
             result = HG_OTHER_ERROR;
@@ -232,8 +235,7 @@ static hg_id_t pymargo_register(
         pymargo_instance_id mid,
         const std::string& rpc_name,
         uint16_t provider_id,
-        py11::object obj,
-        const std::string& method_name)
+        py11::object callable)
 {
     hg_return_t ret;
 
@@ -243,8 +245,8 @@ static hg_id_t pymargo_register(
             provider_id, ABT_POOL_NULL);
 
     pymargo_rpc_data* rpc_data = new pymargo_rpc_data;
-    rpc_data->obj    = obj;
-    rpc_data->method = method_name;
+    rpc_data->callable = callable;
+    rpc_data->callable.inc_ref();
 
     ret = margo_register_data(mid, rpc_id,
                 static_cast<void*>(rpc_data), delete_rpc_data);
@@ -469,17 +471,24 @@ pymargo_hg_handle::~pymargo_hg_handle()
     margo_destroy(handle);
 }
 
-py11::object pymargo_hg_handle::forward(uint16_t provider_id, py11::bytes input)
+py11::object pymargo_hg_handle::forward(uint16_t provider_id,
+                                        py11::bytes input,
+                                        double timeout)
 {
-    int disabled_flag;
     hg_return_t ret;
 
     Py_BEGIN_ALLOW_THREADS
-    ret = margo_provider_forward(provider_id, handle, &input);
+    ret = margo_provider_forward_timed(provider_id, handle, &input, timeout);
     Py_END_ALLOW_THREADS
     if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_provider_forward", ret);
+        throw pymargo_exception("margo_provider_forward_timed", ret);
     }
+    return _get_output();
+}
+
+py11::object pymargo_hg_handle::_get_output() const {
+    hg_return_t ret;
+    int disabled_flag;
     auto mid = margo_hg_handle_get_instance(handle);
     auto info = margo_get_info(handle);
 
@@ -488,6 +497,10 @@ py11::object pymargo_hg_handle::forward(uint16_t provider_id, py11::bytes input)
     if(!disabled_flag) {
         py11::bytes out;
         ret = margo_get_output(handle, &out);
+        if(ret == HG_TIMEOUT) {
+            PyErr_SetString(PyExc_TimeoutError, "Margo forward timed out");
+            throw py11::error_already_set();
+        }
         if(ret != HG_SUCCESS) {
             throw pymargo_exception("margo_get_output", ret);
         }
@@ -501,6 +514,22 @@ py11::object pymargo_hg_handle::forward(uint16_t provider_id, py11::bytes input)
     }
 }
 
+pymargo_request pymargo_hg_handle::iforward(uint16_t provider_id,
+                                            py11::bytes input,
+                                            double timeout)
+{
+    hg_return_t ret;
+    margo_request req;
+
+    Py_BEGIN_ALLOW_THREADS
+    ret = margo_provider_iforward_timed(provider_id, handle, &input, timeout, &req);
+    Py_END_ALLOW_THREADS
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_provider_iforward_timed", ret);
+    }
+    return pymargo_request(req);
+}
+
 void pymargo_hg_handle::respond(py11::bytes output)
 {
     hg_return_t ret;
@@ -510,6 +539,19 @@ void pymargo_hg_handle::respond(py11::bytes output)
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_respond", ret);
     }
+}
+
+pymargo_request pymargo_hg_handle::irespond(py11::bytes output)
+{
+    hg_return_t ret;
+    margo_request req;
+    Py_BEGIN_ALLOW_THREADS
+    ret = margo_irespond(handle, &output, &req);
+    Py_END_ALLOW_THREADS
+    if(ret != HG_SUCCESS) {
+        throw pymargo_exception("margo_respond", ret);
+    }
+    return REQ2CAPSULE(req);
 }
 
 hg_id_t pymargo_hg_handle::get_id() const
@@ -538,7 +580,17 @@ pymargo_instance_id pymargo_hg_handle::_get_mid() const
     }                                                 \
 } while(0)
 
-pymargo_bulk pymargo_bulk_create(
+static py11::str pymargo_get_config(pymargo_instance_id mid) {
+    char* config = margo_get_config(mid);
+    if(!config) return py11::str();
+    else {
+        auto result = py11::str(config);
+        free(config);
+        return result;
+    }
+}
+
+static pymargo_bulk pymargo_bulk_create(
         pymargo_instance_id mid,
         const py11::buffer& data,
         pymargo_bulk_access_mode flags)
@@ -556,21 +608,21 @@ pymargo_bulk pymargo_bulk_create(
     return BULK2CAPSULE(handle);
 }
 
-void pymargo_bulk_free(pymargo_bulk bulk) {
+static void pymargo_bulk_free(pymargo_bulk bulk) {
     hg_return_t ret = margo_bulk_free(bulk);
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_bulk_free", ret);
     }
 }
 
-void pymargo_bulk_ref_incr(pymargo_bulk bulk) {
+static void pymargo_bulk_ref_incr(pymargo_bulk bulk) {
     hg_return_t ret = margo_bulk_ref_incr(bulk);
     if(ret != HG_SUCCESS) {
         throw pymargo_exception("margo_bulk_ref_incr", ret);
     }
 }
 
-void pymargo_bulk_transfer(
+static void pymargo_bulk_transfer(
         pymargo_instance_id mid,
         pymargo_bulk_xfer_mode op,
         pymargo_addr origin_addr,
@@ -588,19 +640,27 @@ void pymargo_bulk_transfer(
     }
 }
 
-std::string pymargo_bulk_to_base64(
-        pymargo_bulk handle, bool request_eager) {
-    hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
-    hg_size_t buf_size = margo_bulk_get_serialize_size(handle, flag);
-    std::string raw_buf(buf_size, '\0');
-    hg_return_t ret = margo_bulk_serialize(const_cast<char*>(raw_buf.data()), buf_size, flag, handle);
+static pymargo_request pymargo_bulk_itransfer(
+        pymargo_instance_id mid,
+        pymargo_bulk_xfer_mode op,
+        pymargo_addr origin_addr,
+        pymargo_bulk origin_handle,
+        size_t origin_offset,
+        pymargo_bulk local_handle,
+        size_t local_offset,
+        size_t size) {
+
+    margo_request req;
+    hg_return_t ret = margo_bulk_itransfer(mid, static_cast<hg_bulk_op_t>(op), origin_addr,
+            origin_handle, origin_offset, local_handle, local_offset, size, &req);
+
     if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_bulk_serialize", ret);
+        throw pymargo_exception("margo_bulk_itransfer", ret);
     }
-    return pymargo_base64_encode(reinterpret_cast<unsigned char const*>(raw_buf.data()), buf_size);
+    return REQ2CAPSULE(req);
 }
 
-py11::bytes pymargo_bulk_to_str(
+static py11::bytes pymargo_bulk_to_str(
         pymargo_bulk handle, bool request_eager) {
 
     hg_bool_t flag = request_eager ? HG_TRUE : HG_FALSE;
@@ -613,23 +673,7 @@ py11::bytes pymargo_bulk_to_str(
     return raw_buf;
 }
 
-pymargo_bulk pymargo_base64_to_bulk(
-        pymargo_instance_id mid,
-        const std::string& rep) {
-
-    std::string raw = pymargo_base64_decode(rep);
-
-    hg_bulk_t handle;
-    hg_return_t ret = margo_bulk_deserialize(mid, &handle, raw.data(), raw.size());
-
-    if(ret != HG_SUCCESS) {
-        throw pymargo_exception("margo_bulk_deserialize", ret);
-    }
-
-    return BULK2CAPSULE(handle);
-}
-
-pymargo_bulk pymargo_str_to_bulk(
+static pymargo_bulk pymargo_str_to_bulk(
         pymargo_instance_id mid,
         const py11::bytes& rep) {
 
@@ -642,6 +686,13 @@ pymargo_bulk pymargo_str_to_bulk(
     }
 
     return BULK2CAPSULE(handle);
+}
+
+static void pymargo_thread_sleep(
+        pymargo_instance_id mid,
+        double t) {
+    py11::gil_scoped_release release;
+    margo_thread_sleep(mid, t);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -795,7 +846,7 @@ static int pymargo_set_logger(py11::object engine, py11::object logger) {
         LOG_FN(critical)
     };
 #undef LOG_FN
-    pymargo_instance_id mid = engine.attr("_mid");
+    pymargo_instance_id mid = engine.attr("_mid").cast<pymargo_instance_id>();
 
     return margo_set_logger(mid, &lgr);
 }
@@ -858,6 +909,16 @@ PYBIND11_MODULE(_pymargo, m)
 //    py11::class_<pymargo_exception>(m, "MargoException")
 //        .def_readonly("code", &pymargo_exception::code);
     py11::register_exception<pymargo_exception>(m, "MargoException");
+    m.def("request_wait", [](pymargo_request req) {
+        auto ret = margo_wait(req);
+        if(ret != HG_SUCCESS) throw pymargo_exception("margo_wait", ret);
+    });
+    m.def("request_test", [](pymargo_request req) {
+        int flag;
+        auto ret = margo_test(req, &flag);
+        if(ret != HG_SUCCESS) throw pymargo_exception("margo_test", (hg_return_t)ret);
+        return static_cast<bool>(flag);
+    });
 
     py11::enum_<margo_log_level>(m, "log_level")
         .value("external", MARGO_LOG_EXTERNAL)
@@ -906,8 +967,13 @@ PYBIND11_MODULE(_pymargo, m)
     py11::class_<pymargo_hg_handle>(m,"Handle")
         .def("_get_hg_addr", &pymargo_hg_handle::_get_hg_addr)
         .def("get_id", &pymargo_hg_handle::get_id)
-        .def("forward", &pymargo_hg_handle::forward)
-        .def("respond", &pymargo_hg_handle::respond)
+        .def("_forward", &pymargo_hg_handle::forward,
+             "provider_id"_a=0, "input"_a=py11::bytes(), "timeout"_a=0.0)
+        .def("_iforward", &pymargo_hg_handle::iforward,
+             "provider_id"_a=0, "input"_a=py11::bytes(), "timeout"_a=0.0)
+        .def("_get_output", &pymargo_hg_handle::_get_output)
+        .def("_respond", &pymargo_hg_handle::respond)
+        .def("_irespond", &pymargo_hg_handle::irespond)
         .def("_get_mid", &pymargo_hg_handle::_get_mid)
         ;
 
@@ -932,6 +998,7 @@ PYBIND11_MODULE(_pymargo, m)
             py11::gil_scoped_release release;
             margo_shutdown_remote_instance(mid, addr);
     });
+    m.def("get_config", pymargo_get_config);
     m.def("register",                 &pymargo_register);
     m.def("register_on_client",       &pymargo_register_on_client);
     m.def("registered",               &pymargo_registered);
@@ -952,10 +1019,11 @@ PYBIND11_MODULE(_pymargo, m)
     m.def("bulk_free",                &pymargo_bulk_free);
     m.def("bulk_ref_incr",            &pymargo_bulk_ref_incr);
     m.def("bulk_transfer",            &pymargo_bulk_transfer);
-    m.def("bulk_to_base64",           &pymargo_bulk_to_base64);
-    m.def("base64_to_bulk",           &pymargo_base64_to_bulk);
+    m.def("bulk_itransfer",           &pymargo_bulk_itransfer);
     m.def("bulk_to_str",              &pymargo_bulk_to_str);
     m.def("str_to_bulk",              &pymargo_str_to_bulk);
+
+    m.def("sleep",                    &pymargo_thread_sleep);
 
     // Inside abt package
     py11::module abt_package = m.def_submodule("abt");

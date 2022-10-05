@@ -1,4 +1,9 @@
 import _pymargo
+from typing import TYPE_CHECKING, Optional
+from .typing import hg_bulk_t, margo_instance_id
+
+if TYPE_CHECKING:
+    from .core import Engine  # noqa: F401
 
 """
 Tags to indicate what type of operations are expected from a Bulk handle.
@@ -20,55 +25,31 @@ class Bulk:
     enable serialization/deserialization to send them in RPCs.
     """
 
-    def __init__(self, engine, hg_bulk):
+    _current_mid: Optional[margo_instance_id] = None
+
+    def __init__(self, hg_bulk: hg_bulk_t):
         """
         Constructor. This method is not supposed to be called by users.
         Users must call Engine.create_bulk instead.
-        engine : Engine from which the Bulk object is created.
         hg_bulk : native hg_bulk_t handle.
         """
-        self._engine = engine
         self._hg_bulk = hg_bulk
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor. Frees the underlying hg_bulk_t handle.
         """
-        _pymargo.bulk_free(self._hg_bulk)
+        if hasattr(self, '_hg_bulk'):
+            _pymargo.bulk_free(self._hg_bulk)
 
-    def to_base64(self, eager=False):
-        """
-        Converts the Bulk handle into a base64 string so it can be sent
-        as argument to an RPC.
-        eager : if set to True, the data exposed by the Bulk handle will
-        be serialized as well.
-        """
-        return _pymargo.bulk_to_base64(self._hg_bulk, eager)
+    def __getstate__(self):
+        return _pymargo.bulk_to_str(self._hg_bulk, False)
 
-    def to_bytes(self, eager=False):
-        """
-        Converts the Bulk handle into a bytes object.
-        eager : if set to True, the data exposed by the Bulk handle will
-        be serialized as well.
-        """
-        return _pymargo.bulk_to_str(self._hg_bulk, eager)
-
-    @staticmethod
-    def from_base64(engine, bulk_str):
-        """
-        Static method that creates a Bulk from a base64 representation.
-        engine : Engine to use for this Bulk handle.
-        bulk_str : base64 representation of a Bulk handle.
-        """
-        blk = _pymargo.base64_to_bulk(engine._mid, bulk_str)
-        return Bulk(engine, blk)
-
-    @staticmethod
-    def from_bytes(engine, bulk_bytes):
-        """
-        Static method that creates a Bulk from a bytes representation.
-        engine : Engine to use for this Bulk handle.
-        bulk_str : bytes representation of a Bulk handle.
-        """
-        blk = _pymargo.str_to_bulk(engine._mid, bulk_bytes)
-        return Bulk(engine, blk)
+    def __setstate__(self, state: bytes):
+        if not hasattr(Bulk, '_current_mid'):
+            raise RuntimeError(
+                "Could not reconstruct Bulk object: no Bulk._current_mid set")
+        if Bulk._current_mid is None:
+            raise RuntimeError(
+                "Could not reconstruct Bulk object: no Bulk._current_mid set")
+        self._hg_bulk = _pymargo.str_to_bulk(Bulk._current_mid, state)

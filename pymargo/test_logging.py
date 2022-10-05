@@ -1,4 +1,5 @@
 import unittest
+import os
 from pymargo.core import Engine
 from pymargo.logging import Logger
 import pymargo.logging
@@ -43,7 +44,8 @@ class TestLogger(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.engine = Engine('na+sm')
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        cls.engine = Engine(protocol)
 
     @classmethod
     def tearDownClass(cls):

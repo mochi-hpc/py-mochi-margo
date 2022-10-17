@@ -354,12 +354,22 @@ class Engine:
             addr, mode, use_progress_thread, num_rpc_threads, opt)
         self._finalized = False
         self._logger = Engine.EngineLogger(self)
+        self._owns_mid = True
+
+    @classmethod
+    def from_margo_instance_id(cls, mid: margo_instance_id) -> 'Engine':
+        engine = cls.__new__(cls)
+        engine._mid = mid
+        engine._finalized = False
+        engine._logger = Engine.EngineLogger(engine)
+        engine._owns_mid = False
+        return engine
 
     def __del__(self) -> None:
         """
         Destructor. Will call finalize it has not been called yet.
         """
-        if not self._finalized:
+        if (not self._finalized) and self._owns_mid:
             self.finalize()
 
     def __enter__(self):
@@ -378,7 +388,7 @@ class Engine:
         """
         See __enter__.
         """
-        if not self._finalized:
+        if (not self._finalized) and self._owns_mid:
             self.finalize()
 
     def finalize(self) -> None:

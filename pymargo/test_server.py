@@ -27,6 +27,14 @@ class TestInitEngine(unittest.TestCase):
         self.assertTrue(engine.listening)
         engine.finalize()
 
+    def test_init_engine_from_mid(self):
+        protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
+        engine = Engine(protocol)
+        engine2 = Engine.from_margo_instance_id(engine.mid)
+        self.assertIsInstance(engine2, Engine)
+        self.assertTrue(engine2.listening)
+        engine.finalize()
+
     def test_engine_config(self):
         protocol = os.environ.get('MARGO_PROTOCOL', 'na+sm')
         engine = Engine(protocol)

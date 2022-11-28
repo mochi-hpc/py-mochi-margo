@@ -179,6 +179,7 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
     hg_return_t ret            = HG_SUCCESS;
     margo_instance_id mid      = MARGO_INSTANCE_NULL;
     const struct hg_info* info = NULL;
+    py11::gil_scoped_acquire acquire;
     py11::bytes input;
 
     mid  = margo_hg_handle_get_instance(handle);
@@ -207,7 +208,6 @@ static hg_return_t pymargo_generic_rpc_callback(hg_handle_t handle)
 
     if(!disabled_flag) {
         std::string out;
-        py11::gil_scoped_acquire acquire;
         try {
             pymargo_hg_handle pyhandle(handle);
             margo_ref_incr(handle);

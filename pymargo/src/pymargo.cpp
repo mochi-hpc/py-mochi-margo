@@ -21,10 +21,10 @@ typedef py11::capsule pymargo_addr;
 typedef py11::capsule pymargo_bulk;
 typedef py11::capsule pymargo_request;
 
-#define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id", nullptr)
-#define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t", nullptr)
-#define BULK2CAPSULE(__blk)  py11::capsule((void*)(__blk), "hg_bulk_t", nullptr)
-#define REQ2CAPSULE(__req)   py11::capsule((void*)(__req), "margo_request", nullptr)
+#define MID2CAPSULE(__mid)   py11::capsule((void*)(__mid), "margo_instance_id")
+#define ADDR2CAPSULE(__addr) py11::capsule((void*)(__addr), "hg_addr_t")
+#define BULK2CAPSULE(__blk)  py11::capsule((void*)(__blk), "hg_bulk_t")
+#define REQ2CAPSULE(__req)   py11::capsule((void*)(__req), "margo_request")
 #define CAPSULE2MID(__caps)  (margo_instance_id)(__caps)
 #define CAPSULE2ADDR(__caps) (hg_addr_t)(__caps)
 #define CAPSULE2BULK(__caps) (hg_bulk_t)(__caps)

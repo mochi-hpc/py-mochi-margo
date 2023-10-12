@@ -24,34 +24,35 @@ jobs:
 
     - name: Find external packages
       run: |
-        spack env create -d .
-        eval `spack env activate --sh .` &&
+        mkdir spackenv
+        spack env create -d spackenv spack.yaml
+        eval `spack env activate --sh spackenv` &&
         spack external find --not-buildable cmake &&
         spack external find --not-buildable perl
 
     - name: Add mochi-spack-packages
       run: |
         git clone https://github.com/mochi-hpc/mochi-spack-packages /opt/spack/mochi-spack-packages
-        eval `spack env activate --sh .` &&
+        eval `spack env activate --sh spackenv` &&
         spack repo add /opt/spack/mochi-spack-packages
 
     - name: Install spack environment
       run: |
-        eval `spack env activate --sh .` &&
+        eval `spack env activate --sh spackenv` &&
         spack concretize -f
         spack install
 
     - name: Show spack-installed packages for debugging
       run: |
-        eval `spack env activate --sh .` &&
+        eval `spack env activate --sh spackenv` &&
         spack find -dlv
 
     - name: Build code
       run: |
-        eval `spack env activate --sh .` &&
+        eval `spack env activate --sh spackenv` &&
         python setup.py build
 
     - name: Run unit tests
       run: |
-        eval `spack env activate --sh .` &&
+        eval `spack env activate --sh spackenv` &&
         ./test.sh

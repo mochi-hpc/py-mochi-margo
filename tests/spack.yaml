@@ -1,0 +1,31 @@
+# This file defines the spack environment used by github actions
+# (tests, codeql, and codecov) when building and testing the code.
+# In particular the "config" field sets the installation path and
+# spack caches to ~/.spack-ci so that they can be retrieved using
+# the github cache action across runs.
+spack:
+  specs:
+  - py-pkgconfig
+  - py-pybind11
+  - py-setuptools
+  - mochi-margo
+  - py-flake8
+  - py-mypy
+  - py-pybind11-stubgen
+  concretizer:
+    unify: true
+    reuse: true
+  modules:
+    prefix_inspections:
+      lib: [LD_LIBRARY_PATH]
+      lib64: [LD_LIBRARY_PATH]
+  packages:
+    mochi-margo:
+      require: "@0.18.1:"
+  mirrors:
+    mochi-buildcache:
+      url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
+      signed: false
+  config:
+    install_tree:
+      padded_length: 128

@@ -1,0 +1,57 @@
+name: Code coverage
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  coverage:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup spack
+      uses: spack/setup-spack@v2.1.1
+      with:
+        ref: develop
+
+    - name: Set install root for Spack
+      run: |
+        spack -e tests config add config:install_tree:root:/opt/spack
+        spack -e tests config add view:/opt/view
+
+    - name: Add mochi-spack-packages
+      run: |
+        git clone https://github.com/mochi-hpc/mochi-spack-packages
+        spack -e tests repo add mochi-spack-packages
+
+    - name: Install spack environment
+      run: |
+        spack -e tests install
+
+    - name: Show spack-installed packages for debugging
+      run: |
+        spack -e tests find -dlv
+
+    - name: Build code
+      run: |
+        eval `spack env activate --sh tests`
+        python setup.py build
+
+    - name: Run unit tests
+      run: |
+        eval `spack env activate --sh tests`
+        ./coverage.sh
+
+    - uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./build/coverage.xml
+        fail_ci_if_error: true
+        verbose: true

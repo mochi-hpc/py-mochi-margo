@@ -12,6 +12,7 @@ spack:
   - py-flake8
   - py-mypy
   - py-pybind11-stubgen
+  - py-coverage
   concretizer:
     unify: true
     reuse: true

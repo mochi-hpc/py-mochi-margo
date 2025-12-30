@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_namespace_packages
 from sysconfig import get_config_vars
 import pybind11
 import pkgconfig
@@ -22,7 +22,7 @@ extra_compile_args=['-std=c++11', '-g']
 if sys.platform == 'darwin':
     extra_compile_args.append('-mmacosx-version-min=10.9')
 
-files = ["pymargo/src/pymargo.cpp"]
+files = ["mochi/margo/src/pymargo.cpp"]
 
 pymargo_module = Extension('_pymargo', files,
         libraries=libraries,
@@ -31,10 +31,11 @@ pymargo_module = Extension('_pymargo', files,
         extra_compile_args=extra_compile_args,
         depends=[])
 
-setup(name='pymargo',
-      version='0.5.1',
+setup(name='margo',
+      version='0.6.0',
       author='Matthieu Dorier',
       description="""Python binding for Margo""",
       ext_modules=[ pymargo_module ],
-      packages=['pymargo']
-     )
+      packages=find_namespace_packages(include=['mochi.*']) + ['pymargo'],
+      python_requires='>=3.6',
+)

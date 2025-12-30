@@ -5,7 +5,7 @@ BUILD=( $HERE/build/lib.* )
 export PYTHONPATH=${BUILD[0]}:$PYTHONPATH
 export MYPYPATH=$HERE/stubs
 
-pybind11-stubgen --root-module-suffix "" _pymargo
+pybind11-stubgen --root-suffix ""  _pymargo
 
 # fix missing capsule class
 printf "class capsule:\n    pass\n" \

@@ -5,8 +5,11 @@ BUILD=( $HERE/build/lib.* )
 export PYTHONPATH=${BUILD[0]}:$PYTHONPATH
 export HG_LOG_LEVEL=""
 
+# Erase old coverage data
+coverage erase
+
 # Run tests with coverage
-coverage run --source=mochi.margo -m unittest --verbose
+coverage run -m unittest --verbose
 
 # Generate coverage report
 echo ""
@@ -21,5 +24,5 @@ echo ""
 echo "HTML coverage report generated in htmlcov/index.html"
 
 # Generate XML coverage report for codecov
-python3 -m coverage xml -o build/coverage.xml
+python3 -m coverage xml
 echo "XML coverage report generated in build/coverage.xml"

@@ -19,3 +19,7 @@ python3 -m coverage report
 python3 -m coverage html
 echo ""
 echo "HTML coverage report generated in htmlcov/index.html"
+
+# Generate XML coverage report for codecov
+python3 -m coverage xml -o build/coverage.xml
+echo "XML coverage report generated in build/coverage.xml"

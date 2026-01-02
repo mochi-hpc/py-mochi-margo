@@ -9,5 +9,7 @@ MargoAddress = core.Address
 MargoHandle = core.Handle
 MargoInstance = core.Engine
 Engine = core.Engine
+Address = core.Address
+Handle = core.Handle
 
 remote = core.remote

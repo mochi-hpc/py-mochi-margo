@@ -13,3 +13,6 @@ Address = core.Address
 Handle = core.Handle
 
 remote = core.remote
+provider = core.provider
+on_finalize = core.on_finalize
+on_prefinalize = core.on_prefinalize

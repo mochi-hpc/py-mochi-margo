@@ -32,7 +32,7 @@ pymargo_module = Extension('_pymargo', files,
         depends=[])
 
 setup(name='margo',
-      version='0.6.0',
+      version='0.6.1',
       author='Matthieu Dorier',
       description="""Python binding for Margo""",
       ext_modules=[ pymargo_module ],
